@@ -1,0 +1,7 @@
+# Functions whose requests come from Google/Strava redirects or the scheduler verify callers themselves.
+[functions.gcal]
+verify_jwt = false
+[functions.strava]
+verify_jwt = false
+[functions.notify]
+verify_jwt = false

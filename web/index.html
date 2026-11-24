@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101010">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Personal">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="platform.js"></script>
+<title>Personal App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm, personal, efficient — a daybook you open every morning.
+   IDEA: a pocket planner: a deep cover band with today's date and weather, tabbed pages inside.
+   PICTURE: the Home page itself — agenda with large hanging times, cards for birthdays, gifts, bills.
+   COLOUR and TYPE: near-black cover, white pages (inverted in dark), red only for overdue. Syne headings + Space Grotesk text.
+   LAYOUT: cover band, sticky tab row, sub-tabs per section, one column that becomes a two-up grid on wide screens. */
+:root{color-scheme:light dark;
+--page:light-dark(#f3f3f3,#0b0b0b);--ink:light-dark(#111111,#f2f2f2);--mute:light-dark(#666666,#9a9a9a);
+--line:light-dark(#e2e2e2,#2a2a2a);--cover:#1b1b1b;--cover2:#101010;--gold:var(--ink);--coral:#d9534f;--ok:var(--ink);--card:light-dark(#ffffff,#161616);--soft:light-dark(#f3f3f3,#1f1f1f);--hl:var(--ink)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 "Space Grotesk",system-ui,sans-serif;overflow-x:clip}
+button,input,select,textarea{font:inherit;color:inherit}
+.cover{background:linear-gradient(160deg,var(--cover),var(--cover2));color:#f2f2f2;padding:calc(clamp(20px,4vw,40px) + env(safe-area-inset-top)) max(5vw,16px,env(safe-area-inset-right)) 18px max(5vw,16px,env(safe-area-inset-left))}
+.wrap{max-width:1240px;margin:auto}
+.top{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+.date{letter-spacing:-.02em;font-weight:800;font:800 clamp(34px,5.6vw,56px)/1.02 "Syne",system-ui,sans-serif;margin:0;text-wrap:balance}
+.hello{color:#bdbdbd;margin:6px 0 0}
+.wx{display:flex;gap:14px;align-items:center;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 16px;max-width:420px}
+.wx{color:inherit;font:inherit;text-align:left;cursor:pointer}.wx:hover{background:rgba(255,255,255,.12)}.wx svg{flex:none}
+.wxp{margin-top:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px}
+.wxp h4{margin:14px 0 8px;font-size:14px;color:#bdbdbd;font-weight:600}.wxp h4:first-child{margin-top:0}
+.hrs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}.hrs .h{flex:none;width:68px;text-align:center;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 4px;font-size:13px}.hrs .h b{display:block;font-size:17px}.hrs .h small{color:#cfcfcf}
+.dl{list-style:none;margin:0;padding:0}.dl li{display:grid;grid-template-columns:92px 30px minmax(0,1fr) 44px 72px;gap:8px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.1);font-size:14px}.dl li:first-child{border-top:0}.dl .r{text-align:right;white-space:nowrap}.dl small{color:#cfcfcf}
+.wxd{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.wxd div{background:rgba(255,255,255,.06);border-radius:10px;padding:8px 10px;font-size:13px;color:#bdbdbd}.wxd b{display:block;color:#fff;font-size:16px}
+.alert{background:rgba(224,87,62,.25);border-radius:10px;padding:8px 12px;margin-bottom:6px;font-size:14px}
+@media(max-width:600px){.dl li{grid-template-columns:70px 26px minmax(0,1fr) 64px}.dl li .pp{display:none}}.wx .t{font:700 32px/1 "Syne",system-ui,sans-serif}.wx small{display:block;color:#bdbdbd;font-size:13px}
+.bars{margin-top:18px}
+.bars input{width:100%;padding:12px 16px;border-radius:12px;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:16px;min-height:46px}
+.bars input::placeholder{color:#9a9a9a}
+.bars form{display:flex;gap:8px}
+.aiwrap{margin-top:10px}.aiwrap .ai{background:rgba(255,255,255,.08);color:#f2f2f2;border-left-color:#fff}
+.status{font-size:13px;color:#9a9a9a;margin-top:8px}
+nav{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+.scroll{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav .scroll{padding:8px max(5vw,16px);max-width:1240px;margin:auto}
+nav a{flex:none;padding:10px 14px;border-radius:10px;text-decoration:none;color:var(--mute);font-weight:500;min-height:44px;display:flex;align-items:center}
+nav a.on{background:var(--ink);color:var(--card)}
+.subs{margin:0 0 18px;gap:6px}
+.subs button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:8px 16px;min-height:40px;cursor:pointer;color:var(--mute);font-weight:500}
+.subs button.on{background:var(--ink);color:var(--card);border-color:transparent}
+main{max-width:1240px;margin:auto;padding:24px max(5vw,16px) 80px}
+h2{letter-spacing:-.02em;font:800 32px/1.05 "Syne",system-ui,sans-serif;margin:0 0 4px}
+h3{font-size:17px;letter-spacing:-.01em;margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+h3 small{font-weight:400;color:var(--mute);font-size:14px}
+.sub{color:var(--mute);margin:0 0 16px}
+.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start}
+.full{grid-column:1/-1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card+.card{margin-top:18px}.grid .card+.card{margin-top:0}
+.banner{background:var(--ink);color:var(--card);border:0}
+.banner .meta{color:inherit;opacity:.75}
+.list{list-style:none;margin:0;padding:0}
+.list>li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.list>li:first-child{border-top:0}
+.when{flex:none;width:72px;font:700 17px/1.1 "Syne",system-ui,sans-serif;color:var(--hl)}
+.when small{display:block;font:12px/1.3 "Space Grotesk";color:var(--mute);margin-top:3px}
+.grow{flex:1}.meta{color:var(--mute);font-size:14px}
+.late{color:var(--coral)!important;font-weight:600}
+.pill{display:inline-block;font-size:13px;padding:1px 8px;border-radius:99px;background:var(--soft);border:1px solid var(--line);margin-left:4px;white-space:nowrap;font-weight:400}
+.pill.hi{background:var(--coral);color:#fff;border-color:transparent}
+.btn{border:0;border-radius:10px;padding:10px 16px;min-height:44px;background:var(--ink);color:var(--card);font-weight:600;cursor:pointer;white-space:nowrap}
+.btn.gold{background:var(--ink);color:var(--card)}.cover .btn.gold{background:#fff;color:#111}.btn.ghost{background:transparent;color:inherit;border:1px solid var(--line)}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ic{border:0;background:none;cursor:pointer;color:var(--mute);min-width:36px;min-height:36px;border-radius:8px;font-size:14px;flex:none}
+.ic:hover{background:var(--soft);color:var(--ink)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.chk{flex:none;width:26px;height:26px;margin-top:1px;accent-color:var(--ink);cursor:pointer}
+.done>.grow>b{text-decoration:line-through;color:var(--mute)}
+form.add{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end;margin-bottom:18px}
+label.f{font-size:13px;color:var(--mute);display:grid;gap:4px}
+.inp,form.add input:not([type=checkbox]),form.add select,form.add textarea{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:16px;min-height:44px;width:100%}
+textarea{resize:vertical;min-height:80px}
+.bar{height:10px;border-radius:99px;background:var(--soft);border:1px solid var(--line);overflow:hidden;margin:8px 0 4px}
+.bar i{display:block;height:100%;background:var(--gold);border-radius:99px;transition:width .4s}
+.bar i.over{background:var(--coral)}
+.big{letter-spacing:-.02em;font:700 42px/1 "Syne",system-ui,sans-serif}
+.empty{color:var(--mute);font-style:italic;padding:8px 0}
+.ai{border-left:3px solid var(--gold);padding:10px 14px;background:var(--soft);border-radius:0 10px 10px 0;white-space:pre-wrap;margin-top:12px;font-size:15px}
+.steps{list-style:none;padding:6px 0 0;margin:0}.steps li{padding:3px 0;font-size:15px}
+.mfp{display:grid;grid-template-columns:repeat(5,auto);gap:4px 10px;align-items:end;text-align:center;justify-content:start}
+.mfp div{display:grid}.mfp b{font:700 28px/1 "Syne",system-ui,sans-serif;font-weight:400}.mfp span{font-size:12px;color:var(--mute)}
+.mfp i{font-style:normal;color:var(--mute);font-size:22px;padding-bottom:14px}
+.meal h3{border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:0}
+.inl{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:8px;margin-top:10px}
+.dots{display:flex;gap:4px;margin-top:6px}.dots i{width:14px;height:14px;border-radius:4px;background:var(--soft);border:1px solid var(--line)}.dots i.y{background:var(--ok);border-color:transparent}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px dashed var(--line);background:var(--card);border-radius:99px;padding:8px 14px;cursor:pointer;min-height:40px}
+.chip.fav{border-style:solid}
+.plan td,.plan th{padding:6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.plan select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);min-height:40px}
+table{border-collapse:collapse;width:100%}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--card);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}
+.toast.show{opacity:1}
+a.lnk{color:var(--hl);font-weight:600}
+.note{display:none;font-size:13px;color:var(--mute);margin-top:10px}
+.day{border-top:1px solid var(--line)}.day:first-child{border-top:0}.day summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 2px;cursor:pointer;min-height:48px;list-style:none}.day summary::-webkit-details-marker{display:none}.day summary::before{content:'›';color:var(--mute);margin-right:8px;transition:transform .2s}.day[open] summary::before{transform:rotate(90deg)}.day summary>span:first-child{flex:1}.day .list{padding:0 0 10px 22px}.okc{color:var(--ok);font-weight:600}
+.subs2 .subs button{min-height:36px;padding:6px 14px;font-size:14px;border-radius:10px}
+.calbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:12px}
+.calwrap{max-height:270px;overflow:auto;border:1px solid var(--line);border-radius:12px;overscroll-behavior:contain}.calwrap .cal.wk{min-width:640px}.calwrap .cal{border-top:0}
+.chead{position:sticky;top:0;z-index:3;background:var(--card)}
+.cal{display:grid;column-gap:0;border-top:1px solid var(--line)}
+.chead{text-align:center;padding:6px 0;cursor:pointer;border-bottom:1px solid var(--line)}.chead span{display:block;font-size:12px;color:var(--mute)}.chead b{font:700 20px/1.2 "Syne",system-ui,sans-serif;font-weight:400}.chead.now b{background:var(--ink);color:var(--card);border-radius:99px;padding:0 8px}
+.allday{padding:4px 2px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);display:grid;gap:3px;align-content:start}
+.tlab{font-size:11px;color:var(--mute);text-align:right;padding-right:6px}
+.tcol{position:relative}.tcol span{position:absolute;right:6px;transform:translateY(-50%);font-size:11px;color:var(--mute);white-space:nowrap}
+.dcol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px)}
+.ev{position:absolute;display:block;overflow:hidden;background:var(--ink);color:var(--card);border-radius:5px;padding:2px 6px;font-size:12px;line-height:1.2;text-decoration:none}
+.ev b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ev span{display:block;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev.app{background:var(--soft);color:var(--ink);border:1px solid var(--ink)}
+.ev.ad{position:static;padding:2px 6px}
+.nowline{position:absolute;left:0;right:0;height:2px;background:var(--coral);z-index:2}.nowline::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--coral)}
+.mic{position:fixed;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));z-index:8;width:64px;height:64px;border-radius:50%;border:0;background:var(--ink);color:var(--card);box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer;display:grid;place-items:center}
+.mic.on{background:var(--coral);color:#fff;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 12px rgba(224,87,62,.25)}}
+.vpanel{position:fixed;right:18px;bottom:96px;z-index:8;width:min(360px,calc(100vw - 36px));background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.vpanel b{display:block;margin-bottom:4px}.vpanel p{margin:0;min-height:24px}
+main{padding-bottom:120px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:600px){.bars{grid-template-columns:1fr}.when{width:56px;font-size:18px}h2{font-size:30px}.inl{grid-template-columns:minmax(0,1fr) 84px}.inl .btn{grid-column:1/-1}
+ .plan thead{display:none}.plan tr{display:grid;grid-template-columns:1fr 1fr 1fr;padding:8px 0;border-bottom:1px solid var(--line)}.plan th{grid-column:1/-1;border:0}.plan td{border:0}}
+</style>
+</head>
+<body>
+<header class="cover">
+ <div class="wrap">
+  <div class="top">
+   <div><p class="date" id="date">Today</p><p class="hello" id="hello">Hello.</p></div>
+   <button class="wx" id="wx" aria-expanded="false" aria-controls="wxp"></button>
+  </div>
+  <div id="wxp" class="wxp" hidden></div>
+  <div class="bars">
+   <form id="askf"><input id="askq" placeholder="AI assistant" aria-label="AI assistant"><button class="btn gold">Go</button></form>
+  </div>
+  <div class="aiwrap"><div class="ai" data-ai="ask" hidden></div></div>
+  <div class="status" id="status"></div>
+ </div>
+</header>
+<nav><div class="scroll" id="tabs"></div></nav>
+<main id="main"></main>
+<div class="toast" id="toast" role="status"></div>
+<div class="vpanel" id="vpanel" hidden><b id="vstate">Listening…</b><p id="vtext" class="meta"></p><div class="row" style="margin-top:10px"><button class="btn sm" id="vdone">Done — do it</button><button class="btn ghost sm" id="vcancel">Cancel</button></div></div>
+<button class="mic" id="mic" hidden aria-label="Speak to the app"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></button>
+<script>
+{
+const TABS=[['home','Home'],['todos','To-dos'],['events','Events'],['habits','Habits'],['goals','Goals'],['health','Health'],['shopping','Shopping'],['notes','Notes'],['settings','Settings']];
+const SUBS={todos:['To-dos','Reminders'],notes:['Notes','Locked'],events:['To schedule','Confirmed / booked','Birthdays','Anniversaries','Holidays'],goals:['Weekly','Monthly','Annual'],health:['Diet','Fitness'],diet:['Food diary','Recipes & meal plan'],money:['Bills','Subscriptions','Spending']};
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MEALS=['Breakfast','Lunch','Dinner','Snacks'];
+const WD=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const ACATS=['Dentist','Doctor','Haircut','Auto','Insurance','Home','Pet','Other'];const REPS={'Every 3 months':3,'Every 6 months':6,'Every year':12,'Every 2 years':24,'Every 3 years':36};const REPO=['No',...Object.keys(REPS)];
+const CATS=['Housing','Groceries','Dining out','Transport','Gas','Shopping','Health','Fun','Travel','Gifts','Other'];
+const LISTS=['notes','todos','reminders','people','dates','appts','bills','subs','spend','goals','habits','food','recipes','workouts','shop'];
+const OBJS=['vault','hlists','settings','habitlog','plan','regimen','steps','weather','sub','fitlog'];
+let S={settings:{name:'',kcal:'',wmin:150,city:'Santa Barbara, CA',heads:7,giftDays:30,holidays:'On',stores:['Costco',"Trader Joe's",'Target'],budgets:{}},habitlog:{},plan:{},regimen:{},steps:{},weather:null,sub:{},fitlog:{},hlists:{},vault:null};
+LISTS.forEach(k=>S[k]=[]);
+let tab=(location.hash||'#home').slice(1);if(!TABS.some(t=>t[0]===tab))tab='home';
+let fwk=0,hwk=0,bookOpen=null,editing=null,query='',db=null,sample=null,mcp=null,cal=null,calErr='',dDay=null,wkOff=0,store=null;const aiOut={};
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today=()=>ymd(new Date());
+const pd=s=>{const[a,b,c]=String(s).slice(0,10).split('-').map(Number);return new Date(a,b-1,c)};
+const addD=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return ymd(d)};
+const days=s=>Math.round((pd(s)-pd(today()))/864e5);
+const fmtD=s=>{if(!s)return'';const d=pd(s);return MONTHS[d.getMonth()]+' '+d.getDate()};
+const dow=s=>WD[pd(s).getDay()].slice(0,3);
+const rel=n=>n===0?'Today':n===1?'Tomorrow':n===-1?'Yesterday':n<0?(-n)+' days ago':'In '+n+' days';
+const tm=s=>{if(!s||s.length<16)return'';const[h,m]=s.slice(11,16).split(':').map(Number);return((h+11)%12+1)+(m?':'+pad(m):'')+(h<12?'am':'pm')};
+const money=n=>'$'+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const sum=(a,f)=>a.reduce((t,x)=>t+(+f(x)||0),0);
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.pointerEvents='none';t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2200)};
+const goalPer=h=>h==='Weekly'?weekStart():h==='Monthly'?today().slice(0,7):today().slice(0,4);
+const subOf=k=>SUBS[k].includes(S.sub[k])?S.sub[k]:SUBS[k][0];
+const find=(k,i)=>S[k].find(x=>x.id===i);
+
+/* ---------- dates & occasions ---------- */
+function nextYearly(m,d){const n=new Date(),y=n.getFullYear();let x=new Date(y,m,+d);if(ymd(x)<today())x=new Date(y+1,m,+d);return ymd(x)}
+const nextBday=p=>nextYearly(MONTHS.indexOf(p.month),p.day);
+function nth(y,m,wd,n){if(n>0){const d=new Date(y,m,1);d.setDate(1+((wd-d.getDay()+7)%7)+7*(n-1));return d}const d=new Date(y,m+1,0);d.setDate(d.getDate()-((d.getDay()-wd+7)%7));return d}
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da)}
+function holidays(){const out=[];const y0=new Date().getFullYear();for(const y of[y0,y0+1]){[["New Year's Day",new Date(y,0,1)],["Valentine's Day",new Date(y,1,14)],['Easter',easter(y)],["Mother's Day",nth(y,4,0,2)],['Memorial Day',nth(y,4,1,-1)],["Father's Day",nth(y,5,0,3)],['Independence Day',new Date(y,6,4)],['Halloween',new Date(y,9,31)],['Thanksgiving',nth(y,10,4,4)],['Christmas Eve',new Date(y,11,24)],['Christmas',new Date(y,11,25)],["New Year's Eve",new Date(y,11,31)]].forEach(([t,d])=>{const s=ymd(d);if(s>=today())out.push({t,date:s})})}return out.sort((a,b)=>a.date>b.date?1:-1)}
+const holiday=t=>holidays().find(h=>h.t===t);
+function billDue(b){const n=new Date(),y=n.getFullYear(),m=n.getMonth();const mk=(y,m)=>new Date(y,m,Math.min(+b.day,new Date(y,m+1,0).getDate()));let d=mk(y,m),off=0;if(ymd(d)<today()){d=mk(y,m+1);off=1}const cur=ymd(d).slice(0,7),paid=b.paid===cur;if(paid)d=mk(y,m+1+off);return{date:ymd(d),paid,cur}}
+function subNext(s){let d=s.next||today();let g=0;while(d<today()&&g++<500)d=s.cycle==='Yearly'?addD(d,0).replace(/^\d{4}/,y=>+y+1):(()=>{const x=pd(d);x.setMonth(x.getMonth()+1);return ymd(x)})();return d}
+function advance(w,r){const d=new Date(w);if(r==='Daily')d.setDate(d.getDate()+1);else if(r==='Weekly')d.setDate(d.getDate()+7);else if(r==='Monthly')d.setMonth(d.getMonth()+1);else if(r==='Yearly')d.setFullYear(d.getFullYear()+1);return ymd(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())}
+const weekStart=(off=0)=>{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7)+7*off);return ymd(d)};
+function occasionsFor(p){const o=[{t:'Christmas',date:holiday('Christmas').date}];if(!p.nobday)o.push({t:p.name+'’s birthday',date:nextBday(p)});const r=(p.rel||'').toLowerCase();
+ if(/mom|mother/.test(r))o.push({t:"Mother's Day",date:holiday("Mother's Day").date});if(/dad|father/.test(r))o.push({t:"Father's Day",date:holiday("Father's Day").date});
+ if(/wife|husband|girlfriend|boyfriend|partner|fianc/.test(r))o.push({t:"Valentine's Day",date:holiday("Valentine's Day").date});
+ S.dates.filter(d=>d.who&&d.who.toLowerCase()===p.name.toLowerCase()).forEach(d=>o.push({t:d.title,date:nextYearly(MONTHS.indexOf(d.month),d.day)}));
+ return o.sort((a,b)=>a.date>b.date?1:-1)}
+function giftPrompts(){const out=[];S.people.forEach(p=>(p.gifts||[]).filter(g=>!g.bought).forEach(g=>{const oc=occasionsFor(p).find(o=>days(o.date)<=(+S.settings.giftDays||30)&&g.skip!==o.date);if(oc)out.push({p,g,oc})}));return out.sort((a,b)=>a.oc.date>b.oc.date?1:-1)}
+const shopLinks=q=>{const e=encodeURIComponent(q);return'<a class="lnk" href="https://www.amazon.com/s?k='+e+'" target="_blank" rel="noopener">Amazon</a> · <a class="lnk" href="https://www.google.com/search?tbm=shop&q='+e+'" target="_blank" rel="noopener">Google Shopping</a> · <a class="lnk" href="https://www.target.com/s?searchTerm='+e+'" target="_blank" rel="noopener">Target</a> · <a class="lnk" href="https://www.etsy.com/search?q='+e+'" target="_blank" rel="noopener">Etsy</a>'};
+function upcoming(n){const out=[],lim=addD(today(),n);
+ S.appts.forEach(a=>{if(a.status!=='Needs scheduling'&&a.date&&a.date>=today()&&a.date<=lim)out.push({date:a.date,time:a.time?a.date+'T'+a.time:'',t:a.title,k:a.cat||'Appointment',where:a.where||'',id:a.id})});
+ S.people.forEach(p=>{const d=nextBday(p);if(d<=lim)out.push({date:d,t:p.name+'’s birthday',k:'Birthday'})});
+ S.dates.forEach(x=>{const d=nextYearly(MONTHS.indexOf(x.month),x.day);if(d<=lim)out.push({date:d,t:x.title,k:x.kind||'Anniversary'})});
+ if(S.settings.holidays!=='Off')holidays().forEach(h=>{if(h.date<=lim)out.push({date:h.date,t:h.t,k:'Holiday'})});
+ return out.sort((a,b)=>(a.date+(a.time||'T99'))>(b.date+(b.time||'T99'))?1:-1)}
+
+/* ---------- storage ---------- */
+const dirty=new Set();let saveT;
+function save(k){dirty.add(k);try{localStorage.setItem('pa2',JSON.stringify(S))}catch(e){}clearTimeout(saveT);saveT=setTimeout(flush,700)}
+async function flush(){if(!db)return dirty.clear();const ks=[...dirty];dirty.clear();for(const k of ks){if(k==='weather')continue;try{await db.doc('app/'+k).set({items:S[k],at:Date.now()})}catch(e){dirty.add(k);setStatus('Couldn’t save just now — will retry with your next change.')}}}
+const setStatus=t=>{$('#status').textContent=t};
+function unwrap(r){const v0=unwrap0(r);return v0===undefined||v0===null?v0:JSON.parse(JSON.stringify(v0))}
+function unwrap0(r){let v=r;if(v&&typeof v.data==='function')v=v.data();if(v&&v.data&&v.data.items!==undefined)v=v.data;return v&&v.items!==undefined?v.items:undefined}
+function migrate(o){if(!o)return;const st=S.settings.stores[0];
+ ['todos','reminders','people','bills','workouts'].forEach(k=>{if(Array.isArray(o[k])&&!S[k].length)S[k]=o[k]});
+ if(o.goals&&!S.goals.length)S.goals=o.goals.map(g=>({...g,horizon:'Annual',period:String(new Date().getFullYear())}));
+ if(o.meals&&!S.food.length)S.food=o.meals.map(m=>({id:m.id,date:m.date,meal:m.meal==='Snack'?'Snacks':m.meal,name:m.what,kcal:m.kcal}));
+ if(o.groceries&&!S.shop.length)S.shop=o.groceries.map(g=>({id:g.id,store:st,name:g.name+(g.qty?' ('+g.qty+')':''),kind:g.cat==='Household'?'Household':'Groceries',on:true,got:!!g.got}));
+ if(o.settings){if(o.settings.name)S.settings.name=o.settings.name;if(o.settings.wmin)S.settings.wmin=o.settings.wmin}}
+async function load(){
+ let local=null;try{local=JSON.parse(localStorage.getItem('pa2')||'null')}catch(e){}
+ if(local)Object.assign(S,local);else{try{migrate(JSON.parse(localStorage.getItem('pa-state')||'null'))}catch(e){}}
+ render();
+ claude.use('sample').then(s=>{sample=s;if(s)render()}).catch(()=>{});
+ claude.use('mcp').then(m=>{mcp=m;render();initWx();watchCal();watchStrava()}).catch(()=>{});
+ let lastDay=today();setInterval(()=>{if(today()!==lastDay){if(calDate===lastDay)calDate=today();lastDay=today();watchCal()}if(tab==='home'&&!document.querySelector('form :focus'))render()},300000);
+ const timer=setTimeout(()=>setStatus('Saved on this device only — couldn’t reach your account storage.'),10000);
+ try{
+  db=await claude.use('db');
+  if(!db){clearTimeout(timer);setStatus('Saved on this device only. Open it signed in to sync.');return}
+  const keys=[...LISTS,...OBJS];
+  const vals=await Promise.all(keys.map(k=>db.doc('app/'+k).get().then(unwrap).catch(()=>undefined)));
+  clearTimeout(timer);let any=false;
+  keys.forEach((k,i)=>{if(vals[i]!==undefined&&vals[i]!==null){S[k]=k==='settings'?{...S.settings,...vals[i]}:vals[i];any=true}});
+  if(!any){try{const user=await claude.use('user');const u=user&&await user.id();if(u){const old={};for(const k of['settings','todos','reminders','people','bills','goals','workouts','meals','groceries']){old[k]=await db.doc('data/users/'+u+'/'+k).get().then(unwrap).catch(()=>undefined)}migrate(old)}}catch(e){}
+   keys.forEach(k=>{if(k!=='weather')dirty.add(k)});flush()}
+  setStatus('');spawn();render();initWx();
+  try{db.doc('app/weather').onSnapshot(s=>{const w=unwrap(s);if(w){S.weather=w;paintWx()}})}catch(e){}
+ }catch(e){clearTimeout(timer);setStatus('Saved on this device only — sync is unavailable right now.')}
+}
+
+/* ---------- appointments ---------- */
+function spawn(){let ch=false;S.appts.forEach(a=>{const m=REPS[a.repeat];if(a.status!=='Needs scheduling'&&a.date&&a.date<today()&&m&&!a.spawned){const d=pd(a.date);d.setMonth(d.getMonth()+m);S.appts.push({id:uid(),title:a.title,cat:a.cat,status:'Needs scheduling',by:ymd(d),last:a.date,repeat:a.repeat,notes:a.notes||'',where:a.where||''});a.spawned=true;ch=true}});if(ch)save('appts')}
+async function sendCal(a){if(await addToCal(a)){a.oncal=true;save('appts');render()}}
+/* ---------- Google Calendar (write only) ---------- */
+const localIso=d=>ymd(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':00';
+function payload(r){let p=r&&r.payload!==undefined?r.payload:r;if(p&&p.structuredContent)p=p.structuredContent;if(p&&Array.isArray(p.content)){const t=p.content.find(c=>c.type==='text');p=t?t.text:p}if(typeof p==='string'){try{p=JSON.parse(p)}catch(e){}}return p}
+let calScrollKey='',calScrollPos=0,calView='Day',calDate=today(),calWeek='',calH=null;
+const weekOf=d=>{const x=pd(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return ymd(x)};
+let calOk=false;async function watchCal(force){if(!mcp)return;const ws=weekOf(calDate);if(ws===calWeek&&!force)return;try{typeof calH==='function'?calH():calH&&calH.unsubscribe&&calH.unsubscribe()}catch(e){}calWeek=ws;cal=null;const s=pd(ws),e=pd(addD(ws,7));const inp={startTime:localIso(s),endTime:localIso(e),orderBy:'startTime',pageSize:250};
+ if(!calOk){try{const p=payload(await mcp.callTool('Google Calendar','list_events',inp));cal=(p&&p.events)||[];calOk=true;calErr='';if(tab==='home')render()}catch(err){calErr=mcpMsg(err,'Google Calendar');calWeek='';if(tab==='home')render();return}}
+ try{calH=mcp.watchTool('Google Calendar','list_events',inp,ev=>{
+  if(ev.type==='data'){const p=payload(ev.result);cal=(p&&p.events)||[];calErr='';if(tab==='home')render()}else if(ev.type==='error'&&!cal){calErr=mcpMsg(ev.error,'Google Calendar');if(tab==='home')render()}},{refetchInterval:600000})}catch(err){calErr={t:'Calendar unavailable right now.'}}}
+const mins=s=>{const t=String(s).slice(11,16).split(':');return(+t[0])*60+(+t[1]||0)};
+function calItems(d){const all=[],timed=[];
+ (cal||[]).forEach(e=>{if(e.status==='cancelled')return;const s=e.start||{},en=e.end||{};const link=String(e.htmlLink||'').startsWith('https://')?e.htmlLink:'';
+  if(s.date){if(d>=s.date&&d<(en.date||addD(s.date,1)))all.push({t:e.summary||'(busy)',link})}
+  else if(s.dateTime){const sd=s.dateTime.slice(0,10),ed=(en.dateTime||s.dateTime).slice(0,10);if(d<sd||d>ed)return;const a=sd===d?mins(s.dateTime):0,b=ed===d?mins(en.dateTime||s.dateTime):1440;timed.push({t:e.summary||'(busy)',a,b:Math.max(b,a+15),w:e.location||'',link,tm:sd===d?tm(s.dateTime):''})}});
+ S.appts.forEach(x=>{if(x.status==='Needs scheduling'||x.date!==d)return;if(x.oncal&&(cal||[]).some(e=>(e.summary||'')===x.title))return;if(x.time){const a=mins('0000-00-00T'+x.time);timed.push({t:x.title,a,b:a+60,w:x.where||'',tm:tm(d+'T'+x.time),app:1})}else all.push({t:x.title,app:1})});
+ S.people.forEach(p=>{if(!p.nobday&&nextBday(p)===d)all.push({t:p.name+'’s birthday'})});
+ timed.sort((x,y)=>x.a-y.a||y.b-x.b);let lanes=[],grp=[],gEnd=0;const flush=()=>{grp.forEach(x=>x.n=lanes.length);lanes=[];grp=[]};
+ timed.forEach(x=>{if(grp.length&&x.a>=gEnd)flush();let i=lanes.findIndex(e=>e<=x.a);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=x.b;x.l=i;grp.push(x);gEnd=Math.max(gEnd,x.b)});flush();
+ return{all,timed}}
+function calendarHTML(){const days=calView==='Week'?[...Array(7)].map((_,i)=>addD(weekOf(calDate),i)):[calDate],data=days.map(calItems);
+ let h0=7,h1=21;data.forEach(x=>x.timed.forEach(e=>{h0=Math.min(h0,Math.floor(e.a/60));h1=Math.max(h1,Math.ceil(e.b/60))}));h1=Math.min(24,h1);const H=30,top=h0*60;let st=0;{const n=new Date(),m=n.getHours()*60+n.getMinutes();const first=data.reduce((a,z)=>Math.min(a,...z.timed.map(e=>e.a)),1440);const focus=days.includes(today())?m-60:first<1440?first-30:8*60;st=Math.max(0,(focus-top)/60*H)}
+ const label=calView==='Week'?fmtD(days[0])+' – '+fmtD(days[6]):(calDate===today()?'Today · ':'')+WD[pd(calDate).getDay()]+', '+fmtD(calDate);
+ let x='<div class="calbar"><div class="row"><button class="btn ghost sm" data-act="cnav" data-d="-1" aria-label="Previous">‹</button><button class="btn ghost sm" data-act="ctoday">Today</button><button class="btn ghost sm" data-act="cnav" data-d="1" aria-label="Next">›</button><b style="margin-left:6px">'+esc(label)+'</b></div><div class="scroll subs" style="margin:0">'+['Day','Week'].map(v=>'<button data-act="cview" data-v="'+v+'" class="'+(calView===v?'on':'')+'">'+v+'</button>').join('')+'</div></div>';
+ x+='<div class="calwrap" id="calwrap" data-k="'+calView+calDate+'" data-st="'+st+'"><div class="cal'+(calView==='Week'?' wk':'')+'" style="grid-template-columns:48px repeat('+days.length+',minmax(0,1fr))">';
+ if(calView==='Week'){x+='<div class="chead"></div>'+days.map(d=>'<div class="chead'+(d===today()?' now':'')+'" data-act="cday" data-d="'+d+'"><span>'+WD[pd(d).getDay()].slice(0,3)+'</span><b>'+pd(d).getDate()+'</b></div>').join('')}
+ if(data.some(z=>z.all.length))x+='<div class="tlab" style="align-self:center">all-day</div>'+data.map(z=>'<div class="allday">'+z.all.map(e=>(e.link?'<a class="ev ad" href="'+esc(e.link)+'" target="_blank" rel="noopener">':'<div class="ev ad'+(e.app?' app':'')+'">')+esc(e.t)+(e.link?'</a>':'</div>')).join('')+'</div>').join('');
+ x+='<div class="tcol" style="height:'+(h1-h0)*H+'px">'+[...Array(h1-h0)].map((_,i)=>{const hr=h0+i;return'<span style="top:'+i*H+'px">'+(i?((hr+11)%12+1)+(hr<12?'am':'pm'):'')+'</span>'}).join('')+'</div>';
+ days.forEach((d,k)=>{x+='<div class="dcol" style="height:'+(h1-h0)*H+'px;background-size:100% '+H+'px">';
+  data[k].timed.forEach(e=>{const tp=(Math.max(e.a,top)-top)/60*H,ht=Math.max(18,(Math.min(e.b,h1*60)-Math.max(e.a,top))/60*H-2),w=100/e.n;const inner='<b>'+esc(e.t)+'</b>'+(ht>30?'<span>'+esc(e.tm)+(e.w?' · '+esc(e.w):'')+'</span>':'');
+   const st='top:'+tp+'px;height:'+ht+'px;left:calc('+w*e.l+'% + 2px);width:calc('+w+'% - 4px)';x+=e.link?'<a class="ev" style="'+st+'" href="'+esc(e.link)+'" target="_blank" rel="noopener">'+inner+'</a>':'<div class="ev'+(e.app?' app':'')+'" style="'+st+'">'+inner+'</div>'});
+  if(d===today()){const n=new Date(),m=n.getHours()*60+n.getMinutes();if(m>=top&&m<=h1*60)x+='<i class="nowline" style="top:'+((m-top)/60*H)+'px"></i>'}
+  x+='</div>'});
+ x+='</div></div>';
+ if(!mcp)x+='<p class="meta" style="margin-top:8px">Your Google Calendar shows here when the app is opened in Claude.</p>';else if(calErr)x+='<p class="meta" style="margin-top:8px">'+esc(calErr.t||calErr)+(calErr.allow?' <button class="btn sm" data-act="calallow">Load calendar</button>':'')+'</p>';else if(!cal)x+='<p class="meta" style="margin-top:8px">Loading your calendar…</p>';
+ return x}
+
+async function addToCal(a){if(!mcp)return false;const st=a.time?a.date+'T'+a.time+':00':a.date+'T00:00:00';let en;if(a.time){const d=new Date(st);d.setMinutes(d.getMinutes()+(+a.mins||60));en=localIso(d)}else en=addD(a.date,1)+'T00:00:00';
+ try{await mcp.callTool('Google Calendar','create_event',{summary:a.title,startTime:st,endTime:en,allDay:!a.time,location:a.where||undefined,description:a.notes||undefined});toast('Added to Google Calendar');return true}catch(e){toast('Couldn’t add to Google Calendar');return false}}
+
+/* ---------- AI ---------- */
+function snapshot(){const s={today:today()+' '+WD[new Date().getDay()],time:new Date().toTimeString().slice(0,5),people:S.people.map(p=>({id:p.id,name:p.name,rel:p.rel,month:p.month,day:p.day,gifts:(p.gifts||[]).map(g=>g.idea),plans:(p.plans||[]).map(x=>x.text)})),stores:S.settings.stores,upcoming:upcoming(14).slice(0,30),needsScheduling:S.appts.filter(a=>a.status==='Needs scheduling'),todos:S.todos.filter(t=>!t.done).slice(0,40),reminders:S.reminders.slice(0,30),bills:S.bills,goals:S.goals,habits:S.habits.map(h=>({id:h.id,name:h.name,group:hgOf(h)})),calorieGoal:S.settings.kcal,recipes:S.recipes.map(r=>r.name),recentActivities:svActs().slice(0,10).map(a=>({date:a.start_local,name:a.name,type:a.sport_type,moving_min:Math.round(((a.summary||{}).moving_time||0)/60),distance:(a.summary||{}).distance_display||'',strain:strain(a)}))};return JSON.stringify(s)}
+const add=(k,o,front)=>{o.id=uid();front?S[k].unshift(o):S[k].push(o);save(k);render();return'done'};
+const personByName=n=>S.people.find(p=>p.name.toLowerCase()===String(n).toLowerCase())||S.people.find(p=>(p.rel||'').toLowerCase()===String(n).toLowerCase())||S.people.find(p=>p.name.toLowerCase().includes(String(n).toLowerCase()));
+const T=(name,description,props,req,fn)=>({name,description,inputSchema:{type:'object',properties:props,required:req},execute:fn});
+const str={type:'string'},num={type:'number'};
+const aiTools=[
+ T('add_todo','Add a to-do. due YYYY-MM-DD optional.',{title:str,due:str,pri:{type:'string',enum:['Normal','High','Low']}},['title'],i=>add('todos',{title:i.title,due:i.due||'',pri:i.pri||'Normal',done:false},1)),
+ T('add_reminder','Add a reminder. when = local YYYY-MM-DDTHH:MM. repeat Never|Daily|Weekly|Monthly|Yearly.',{title:str,when:str,repeat:str},['title','when'],i=>add('reminders',{title:i.title,when:i.when,repeat:i.repeat||'Never'})),
+ T('add_shopping','Add items to a store list. kind Groceries or Household. store must be one of the user\'s stores (else first store).',{store:str,kind:str,items:{type:'array',items:str}},['items'],i=>{const st=S.settings.stores.find(s=>s.toLowerCase()===String(i.store||'').toLowerCase())||S.settings.stores[0];(i.items||[]).forEach(n=>S.shop.push({id:uid(),store:st,name:n,kind:i.kind==='Household'?'Household':'Groceries',on:true,got:false}));save('shop');render();return'added to '+st}),
+ T('add_birthday','Save someone\'s birthday. month Jan..Dec.',{name:str,month:str,day:num,year:num,rel:str},['name','month','day'],i=>add('people',{name:i.name,month:i.month,day:i.day,year:i.year||'',rel:i.rel||'',gifts:[]})),
+ T('add_gift_idea','Save a gift idea for a person (match by name or relation like "mom"). If no such person exists, create them with just a name/relation.',{person:str,idea:str},['person','idea'],i=>{let p=personByName(i.person);if(!p){p={id:uid(),name:i.person.replace(/^./,c=>c.toUpperCase()),rel:i.person,month:'Jan',day:1,gifts:[],nobday:true};S.people.push(p)}(p.gifts=p.gifts||[]).push({id:uid(),idea:i.idea,added:today()});save('people');render();return'saved for '+p.name}),
+ T('add_birthday_plan','Save a birthday plan for a person (e.g. "dinner at Nobu Saturday").',{person:str,plan:str},['person','plan'],i=>{const p=personByName(i.person);if(!p)return'no such person — add their birthday first';(p.plans=p.plans||[]).push({id:uid(),text:i.plan});save('people');render();return'saved for '+p.name}),
+ T('add_holiday_list_item','Add an item to a holiday list (e.g. Christmas gift list). holiday is the holiday name, e.g. Christmas.',{holiday:str,text:str},['holiday','text'],i=>{const hd=holidays().find(x=>x.t.toLowerCase()===String(i.holiday).toLowerCase())||holidays().find(x=>x.t.toLowerCase().includes(String(i.holiday).toLowerCase()));if(!hd)return'unknown holiday';const key=hd.t+' '+hd.date.slice(0,4);(S.hlists[key]=S.hlists[key]||[]).push({id:uid(),text:i.text,done:false});save('hlists');render();return'added to '+hd.t}),
+ T('add_note','Save a plain note (NOT passwords — tell the user to put passwords in Notes → Locked themselves).',{title:str,body:str},['title'],i=>add('notes',{title:i.title,body:i.body||'',updated:today()},1)),
+ T('add_date','Save a yearly date such as an anniversary. kind Anniversary|Other.',{title:str,month:str,day:num,year:num,who:str,kind:str},['title','month','day'],i=>add('dates',{title:i.title,month:i.month,day:i.day,year:i.year||'',who:i.who||'',kind:i.kind||'Anniversary'})),
+ T('add_appointment','Add a PERSONAL appointment or thing that needs booking (dentist, haircut, oil change, auto repair, insurance renewal, doctor). Never work meetings. If it is not booked yet, omit date: it goes to "Needs scheduling" (by = optional deadline YYYY-MM-DD). If booked, give date YYYY-MM-DD and optional time HH:MM. cat one of '+ACATS.join(', ')+'. repeat one of '+REPO.join(', ')+'. For upkeep just done ("just got my tires done, every 3 years") set last_done to today and repeat; the due date is computed.',{title:str,cat:str,date:str,time:str,where:str,by:str,repeat:str,last_done:str,notes:str},['title'],i=>{let by=i.by||'';const rp=REPS[i.repeat]?i.repeat:'No';if(!by&&i.last_done&&REPS[rp]){const d=pd(i.last_done);d.setMonth(d.getMonth()+REPS[rp]);by=ymd(d)}return add('appts',{title:i.title,cat:ACATS.includes(i.cat)?i.cat:'Other',status:i.date?'Booked':'Needs scheduling',date:i.date||'',time:i.time||'',where:i.where||'',by,last:i.last_done||'',repeat:rp,notes:i.notes||''})}),
+ T('book_appointment','Mark a "Needs scheduling" item as booked (find it with find_items section appts).',{id:str,date:str,time:str,where:str},['id','date'],i=>{const a=find('appts',i.id);if(!a)return'not found';Object.assign(a,{status:'Booked',date:i.date,time:i.time||a.time||'',where:i.where||a.where||''});save('appts');render();return'booked'}),
+ T('add_to_google_calendar','Put a BOOKED appointment on Google Calendar. Only when the user asks.',{id:str},['id'],async i=>{const a=find('appts',i.id);if(!a||!a.date)return'not booked';await sendCal(a);return a.oncal?'added':'failed'}),
+ T('log_food','Log food in the diary. meal Breakfast|Lunch|Dinner|Snacks. kcal estimate if not given.',{meal:str,name:str,kcal:num,date:str},['meal','name'],i=>add('food',{date:i.date||today(),meal:MEALS.includes(i.meal)?i.meal:'Snacks',name:i.name,kcal:i.kcal||0})),
+ T('log_spending','Log a purchase. cat one of '+CATS.join(', '),{amount:num,cat:str,note:str,date:str},['amount'],i=>add('spend',{date:i.date||today(),amount:i.amount,cat:CATS.includes(i.cat)?i.cat:'Other',note:i.note||''},1)),
+ T('search_everything','Search all of the user\'s data (to-dos, reminders, people & gift ideas, appointments, bills, subscriptions, spending, goals, habits, recipes, shopping, holiday lists) for text.',{text:str},['text'],i=>{const q=String(i.text).toLowerCase(),out={};[...LISTS].forEach(k=>{const m=S[k].filter(x=>JSON.stringify(x).toLowerCase().includes(q));if(m.length)out[k]=m.slice(0,10)});Object.entries(S.hlists||{}).forEach(([k,L])=>{const m=L.filter(x=>x.text.toLowerCase().includes(q));if(m.length)out['holiday list: '+k]=m});return JSON.stringify(out)}),
+ T('find_items','Find existing items to update/complete/delete. section one of '+LISTS.join(', ')+'. Returns ids.',{section:str,text:str},['section'],i=>{const k=LISTS.includes(i.section)?i.section:null;if(!k)return'unknown section';const q=String(i.text||'').toLowerCase();return JSON.stringify(S[k].filter(x=>!q||JSON.stringify(x).toLowerCase().includes(q)).slice(0,15))}),
+ T('update_item','Change fields of an item found with find_items (e.g. new due date, amount, time, title, progress).',{section:str,id:str,fields:{type:'object'}},['section','id','fields'],i=>{const x=LISTS.includes(i.section)&&find(i.section,i.id);if(!x)return'not found';Object.assign(x,i.fields||{});save(i.section);render();return'updated'}),
+ T('complete_item','Mark an item done: todos (done), reminders (done/roll forward), bills (paid this cycle), shop (checked off), goals (achieved), habits (done today), food/spend n/a.',{section:str,id:str},['section','id'],i=>{const k=i.section,x=LISTS.includes(k)&&find(k,i.id);if(!x)return'not found';
+  if(k==='todos'||k==='goals')x.done=true;else if(k==='shop')x.got=true;else if(k==='bills')x.paid=billDue(x).cur;
+  else if(k==='reminders'){if(x.repeat&&x.repeat!=='Never')x.when=advance(x.when,x.repeat);else S.reminders=S.reminders.filter(r=>r.id!==x.id)}
+  else if(k==='habits'){const t=today(),l=S.habitlog[t]=S.habitlog[t]||[];if(!l.includes(x.id))l.push(x.id);save('habitlog')}
+  save(k);render();return'done'}),
+ T('delete_item','Delete an item found with find_items.',{section:str,id:str},['section','id'],i=>{if(!LISTS.includes(i.section))return'unknown';S[i.section]=S[i.section].filter(x=>x.id!==i.id);save(i.section);render();return'deleted'}),
+ T('update_settings','Change a setting: kcal (daily calorie goal), city (when they say where they are, e.g. "I\'m in Santa Barbara" → "Santa Barbara, CA"), name, heads, giftDays, wmin.',{key:str,value:str},['key','value'],i=>{if(!['kcal','city','name','heads','giftDays','wmin'].includes(i.key))return'unknown';S.settings[i.key]=i.value;save('settings');render();if(i.key==='city')initWx();return'saved'}),
+ T('log_steps','Save today\'s step count.',{steps:num},['steps'],i=>{S.steps[today()]=i.steps;save('steps');render();return'saved'}),
+ T('add_habit','Add a habit. group: Morning routine | Daily habits | Evening routine.',{name:str,group:str},['name'],i=>add('habits',{name:i.name,group:HG.includes(i.group)?i.group:'Daily habits'})),
+ T('set_workout_day','Set the workout plan for a weekday (Monday..Friday): name and exercises (one per array item).',{day:str,name:str,exercises:{type:'array',items:str}},['day','name'],i=>{const d=WD.findIndex(w=>w.toLowerCase()===String(i.day).toLowerCase());if(d<1||d>5)return'Mon-Fri only';S.regimen[d]={name:i.name,ex:(i.exercises||[]).join('\n')||(S.regimen[d]||{}).ex||''};save('regimen');render();return'saved'}),
+ T('mark_workout_done','Mark the planned workout done for a date (default today).',{date:str},[],i=>{const d=i.date||today();const L=S.fitlog[d]=S.fitlog[d]||{};L.done=true;save('fitlog');render();return'done'}),
+ T('add_goal','Add a goal. horizon Weekly|Monthly|Annual.',{title:str,horizon:str},['title','horizon'],i=>{const hz=['Weekly','Monthly','Annual'].includes(i.horizon)?i.horizon:'Annual';return add('goals',{title:i.title,horizon:hz,period:goalPer(hz)})})
+];
+const sys='You are the assistant inside the user\'s personal life app. Be brief and warm. Plain text, no markdown. Their data (JSON): ';
+async function ask(key,prompt,tools){
+ if(!sample){toast('AI isn’t available in this view');return}
+ aiOut[key]='Thinking…';paintAI(key);
+ try{const r=await sample(prompt,{modelTier:'default',cache:false,tools:tools?aiTools:undefined,onText:({text})=>{aiOut[key]=text;paintAI(key)}});aiOut[key]=r.text;paintAI(key);return r.text}
+ catch(e){aiOut[key]=e&&e.code==='rate_limited'?'Too many requests — try again in a minute.':e&&e.code==='not_granted'?'AI access wasn’t allowed.':'Something went wrong asking AI.';paintAI(key)}}
+function paintAI(k){document.querySelectorAll('[data-ai="'+k+'"]').forEach(el=>{el.hidden=!aiOut[k];el.textContent=aiOut[k]||''})}
+
+/* ---------- forms ---------- */
+const F={
+ todos:[['title','Task','text',1],['due','Due','date'],['pri','Priority',['Normal','High','Low']]],
+ reminders:[['title','Remind me to','text',1],['when','When','datetime-local',1],['repeat','Repeat',['Never','Daily','Weekly','Monthly','Yearly']]],
+ people:[['name','Name','text',1],['rel','Who they are (mom, best friend…)','text'],['month','Month',MONTHS],['day','Day','number',1],['year','Birth year (optional)','number'],['phone','Phone (optional)','tel']],
+ dates:[['title','What (e.g. Our anniversary)','text',1],['kind','Kind',['Anniversary','Other']],['who','With / for (optional)','text'],['month','Month',MONTHS],['day','Day','number',1],['year','Year it started (optional)','number']],
+ appts:[['title','What','text',1],['cat','Type',ACATS],['status','Status',['Needs scheduling','Booked']],['date','Date (once booked)','date'],['time','Time','time'],['where','Where','text'],['by','Get it booked by','date'],['repeat','Repeats',REPO],['last','Last done','date'],['notes','Notes','text']],
+ bills:[['name','Bill (rent, electric…)','text',1],['amount','Amount ($)','number',1],['day','Due day of month','number',1],['autopay','Autopay',['No','Yes']]],
+ subs:[['name','Subscription','text',1],['amount','Cost ($)','number',1],['cycle','Billed',['Monthly','Yearly']],['next','Next renewal','date',1]],
+ spend:[['amount','Amount ($)','number',1],['cat','Category',CATS],['note','What','text'],['date','Date','date',1]],
+ goals:[['title','Goal','text',1]],
+ notes:[['title','Title','text',1],['body','Note','textarea']],
+ habits:[['name','Habit','text',1],['group','Where',['Morning routine','Daily habits','Evening routine']]],
+ recipes:[['name','Recipe','text',1],['kcal','Calories per serving','number'],['store','Shop at',null],['ingredients','Ingredients (one per line)','textarea']],
+ workouts:[['date','Date','date',1],['type','Type',['Strength','Run','Walk','Cycle','Swim','Yoga','Sport','Other']],['min','Minutes','number',1],['notes','Notes','text']]
+};
+function form(k,extra=''){const it=editing&&editing.k===k?find(k,editing.id):null;
+ return'<form class="add card" data-form="'+k+'">'+F[k].map(([n,l,t,r])=>{if(n==='store')t=S.settings.stores;const v=it?it[n]??'':(t==='date'&&k!=='appts'?today():'');
+  if(Array.isArray(t))return'<label class="f">'+esc(l)+'<select name="'+n+'">'+t.map(x=>'<option'+(String(v)===x?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></label>';
+  if(t==='textarea')return'<label class="f" style="grid-column:1/-1">'+esc(l)+'<textarea name="'+n+'">'+esc(v)+'</textarea></label>';
+  return'<label class="f">'+esc(l)+'<input name="'+n+'" type="'+t+'" value="'+esc(v)+'"'+(r?' required':'')+(t==='number'?' step="any"':'')+'></label>'}).join('')+extra+
+ '<div class="row"><button class="btn">'+(it?'Save':'Add')+'</button>'+(it?'<button type="button" class="btn ghost" data-act="cancel">Cancel</button>':'')+'</div></form>'}
+const acts=(k,i)=>'<button class="ic" data-act="edit" data-k="'+k+'" data-id="'+esc(i.id)+'">Edit</button><button class="ic" data-act="del" data-k="'+k+'" data-id="'+esc(i.id)+'" aria-label="Delete">✕</button>';
+const empty=t=>'<li class="empty">'+t+'</li>';
+const subtabs=k=>'<div class="scroll subs">'+SUBS[k].map(s=>'<button data-act="sub" data-k="'+k+'" data-v="'+esc(s)+'" class="'+(subOf(k)===s?'on':'')+'">'+esc(s)+'</button>').join('')+'</div>';
+const head=(t,s)=>'<h2>'+esc(t)+'</h2><p class="sub">'+s+'</p>';
+
+/* ---------- row renderers ---------- */
+const R={
+ todos:a=>[...a].sort((x,y)=>(x.done-y.done)||((x.due||'9')>(y.due||'9')?1:-1)).map(i=>{const n=i.due?days(i.due):null;return'<li class="'+(i.done?'done':'')+'"><input type="checkbox" class="chk" data-act="tog" data-id="'+esc(i.id)+'"'+(i.done?' checked':'')+' aria-label="Done"><div class="grow"><b>'+esc(i.title)+'</b>'+(i.pri==='High'?'<span class="pill hi">High</span>':'')+'<div class="meta">'+(i.due?'<span class="'+(n<0&&!i.done?'late':'')+'">'+rel(n)+' · '+fmtD(i.due)+'</span>':'No due date')+'</div>'+(i.steps&&i.steps.length?'<ul class="steps">'+i.steps.map((s,j)=>'<li><label><input type="checkbox" data-act="step" data-id="'+esc(i.id)+'" data-j="'+j+'"'+(s.done?' checked':'')+'> '+esc(s.t)+'</label></li>').join('')+'</ul>':'')+(!i.done&&sample?'<button class="btn ghost sm" style="margin-top:6px" data-act="breakdown" data-id="'+esc(i.id)+'">Break it down</button>':'')+'</div>'+acts('todos',i)+'</li>'}).join('')||empty('Nothing here yet.'),
+ reminders:a=>[...a].sort((x,y)=>x.when>y.when?1:-1).map(i=>'<li><div class="when">'+fmtD(i.when)+'<small>'+tm(i.when)+'</small></div><div class="grow"><b>'+esc(i.title)+'</b><div class="meta"><span class="'+(new Date(i.when)<new Date()?'late':'')+'">'+rel(days(i.when))+'</span>'+(i.repeat&&i.repeat!=='Never'?' · repeats '+esc(i.repeat.toLowerCase()):'')+'</div><button class="btn ghost sm" style="margin-top:6px" data-act="rdone" data-id="'+esc(i.id)+'">Done</button></div>'+acts('reminders',i)+'</li>').join('')||empty('No reminders yet.'),
+ people:a=>[...a].sort((x,y)=>nextBday(x)>nextBday(y)?1:-1).map(i=>{const nb=nextBday(i),age=i.year?pd(nb).getFullYear()-i.year:null;return'<li><div class="when">'+(i.nobday?'—':esc(i.month)+' '+esc(i.day))+'<small>'+(i.nobday?'Add birthday':rel(days(nb)))+'</small></div><div class="grow"><b>'+esc(i.name)+'</b><div class="meta">'+esc(i.rel||'')+(age&&!i.nobday?' · turns '+age:'')+(i.phone?' · '+esc(i.phone):'')+'</div>'+((i.gifts||[]).length?'<ul class="steps">'+i.gifts.map(g=>'<li class="meta">Gift idea: '+(g.bought?'<s>'+esc(g.idea)+'</s> (bought)':esc(g.idea))+' <button class="ic" data-act="gdel" data-p="'+esc(i.id)+'" data-id="'+esc(g.id)+'" aria-label="Remove idea">✕</button></li>').join('')+'</ul>':'')+((i.plans||[]).length?'<ul class="steps">'+i.plans.map(g=>'<li class="meta">Plan: '+esc(g.text)+' <button class="ic" data-act="pdel" data-p="'+esc(i.id)+'" data-id="'+esc(g.id)+'" aria-label="Remove plan">✕</button></li>').join('')+'</ul>':'')+'<form class="row" data-gift="'+esc(i.id)+'" style="margin-top:6px"><input class="inp" name="g" placeholder="Gift idea or plan" style="flex:1;min-width:160px"><button class="btn ghost sm" name="kind" value="gift">+ Gift idea</button><button class="btn ghost sm" name="kind" value="plan">+ Plan</button></form></div>'+acts('people',i)+'</li>'}).join('')||empty('Add the people you love.'),
+ dates:a=>[...a].sort((x,y)=>nextYearly(MONTHS.indexOf(x.month),x.day)>nextYearly(MONTHS.indexOf(y.month),y.day)?1:-1).map(i=>{const d=nextYearly(MONTHS.indexOf(i.month),i.day),yrs=i.year?pd(d).getFullYear()-i.year:null;return'<li><div class="when">'+esc(i.month)+' '+esc(i.day)+'<small>'+rel(days(d))+'</small></div><div class="grow"><b>'+esc(i.title)+'</b><div class="meta">'+esc(i.kind)+(i.who?' · '+esc(i.who):'')+(yrs?' · '+yrs+' years':'')+'</div></div>'+acts('dates',i)+'</li>'}).join('')||empty('No anniversaries yet.'),
+ appts:a=>a.filter(x=>x.status!=='Needs scheduling').sort((x,y)=>((x.date||'')+(x.time||''))>((y.date||'')+(y.time||''))?1:-1).map(i=>'<li><div class="when">'+fmtD(i.date)+'<small>'+(i.time?tm(i.date+'T'+i.time):dow(i.date))+'</small></div><div class="grow"><b>'+esc(i.title)+'</b><span class="pill">'+esc(i.cat||'Other')+'</span><div class="meta">'+rel(days(i.date))+(i.where?' · '+esc(i.where):'')+(REPS[i.repeat]?' · '+esc(i.repeat.toLowerCase()):'')+'</div><div class="row" style="margin-top:6px">'+(i.oncal?'<span class="pill" style="margin:0">On Google Calendar</span>':mcp?'<button class="btn ghost sm" data-act="tocal" data-id="'+esc(i.id)+'">Add to Google Calendar</button>':'')+'</div></div>'+acts('appts',i)+'</li>').join('')||empty('Nothing booked yet.'),
+ tosched:a=>a.filter(x=>x.status==='Needs scheduling').sort((x,y)=>(x.by||'9')>(y.by||'9')?1:-1).map(i=>{const n=i.by?days(i.by):null;return'<li><div class="grow"><b>'+esc(i.title)+'</b><span class="pill">'+esc(i.cat||'Other')+'</span><div class="meta">'+(i.by?'<span class="'+(n<=7?'late':'')+'">Due '+fmtD(i.by)+(Math.abs(n)<400?' ('+rel(n).toLowerCase()+')':' '+pd(i.by).getFullYear())+'</span>':'No due date')+(i.last?' · last done '+fmtD(i.last)+' '+pd(i.last).getFullYear():'')+(REPS[i.repeat]?' · '+esc(i.repeat.toLowerCase()):'')+(i.notes?' · '+esc(i.notes):'')+'</div>'+((!i.by||n<=30)?'<div class="meta" style="margin-top:4px">Want to book it? <a class="lnk" href="https://www.google.com/maps/search/'+encodeURIComponent(i.title+' near '+(S.settings.city||''))+'" target="_blank" rel="noopener">Find a place nearby</a></div>':'')+(bookOpen===i.id?'<form class="add" data-book="'+esc(i.id)+'" style="margin:10px 0 0"><label class="f">Date<input name="date" type="date" required></label><label class="f">Time<input name="time" type="time"></label><label class="f">Where<input name="where" value="'+esc(i.where||'')+'"></label>'+(mcp?'<label class="f" style="display:flex;gap:8px;align-items:center;min-height:44px"><input type="checkbox" name="cal" class="chk"> Add to Google Calendar</label>':'')+'<div class="row"><button class="btn">Save booking</button><button type="button" class="btn ghost" data-act="bookx">Cancel</button></div></form>':'<button class="btn sm" style="margin-top:6px" data-act="book" data-id="'+esc(i.id)+'">Booked it</button>')+'</div>'+acts('appts',i)+'</li>'}).join('')||empty('Nothing waiting to be booked.'),
+ bills:a=>[...a].sort((x,y)=>billDue(x).date>billDue(y).date?1:-1).map(i=>{const d=billDue(i),n=days(d.date);return'<li><input type="checkbox" class="chk" data-act="paid" data-id="'+esc(i.id)+'"'+(d.paid?' checked':'')+' aria-label="Paid this month"><div class="grow"><b>'+esc(i.name)+'</b><span class="pill">'+money(i.amount)+'</span>'+(i.autopay==='Yes'?'<span class="pill">Autopay</span>':'')+'<div class="meta">'+(d.paid?'Paid · next due ':'')+'<span class="'+(!d.paid&&n<=2?'late':'')+'">'+fmtD(d.date)+' ('+rel(n).toLowerCase()+')</span></div></div>'+acts('bills',i)+'</li>'}).join('')||empty('No bills yet. Add rent first.'),
+ subs:a=>[...a].sort((x,y)=>subNext(x)>subNext(y)?1:-1).map(i=>{const d=subNext(i);return'<li><div class="when">'+fmtD(d)+'<small>'+rel(days(d))+'</small></div><div class="grow"><b>'+esc(i.name)+'</b><span class="pill">'+money(i.amount)+' / '+(i.cycle==='Yearly'?'yr':'mo')+'</span><div class="meta">'+money(i.cycle==='Yearly'?i.amount:i.amount*12)+' a year</div></div>'+acts('subs',i)+'</li>'}).join('')||empty('No subscriptions yet.'),
+ spend:a=>[...a].sort((x,y)=>x.date<y.date?1:-1).slice(0,60).map(i=>'<li><div class="when">'+fmtD(i.date)+'<small>'+esc(i.cat)+'</small></div><div class="grow"><b>'+money(i.amount)+'</b><div class="meta">'+esc(i.note||'')+'</div></div>'+acts('spend',i)+'</li>').join('')||empty('No spending logged this month.'),
+ goals:a=>a.map(i=>'<li class="'+(i.done?'done':'')+'"><input type="checkbox" class="chk" data-act="gdone" data-id="'+esc(i.id)+'"'+(i.done?' checked':'')+' aria-label="Achieved"><div class="grow"><b>'+esc(i.title)+'</b></div>'+acts('goals',i)+'</li>').join('')||empty('No goals for this period yet.'),
+ workouts:a=>[...a].sort((x,y)=>x.date<y.date?1:-1).slice(0,30).map(i=>'<li><div class="when">'+fmtD(i.date)+'<small>'+esc(i.min)+' min</small></div><div class="grow"><b>'+esc(i.type)+'</b><div class="meta">'+esc(i.notes||'')+'</div></div>'+acts('workouts',i)+'</li>').join('')||empty('No workouts logged yet.'),
+ notes:a=>[...a].sort((x,y)=>(x.updated||'')<(y.updated||'')?1:-1).map(i=>'<li><div class="grow"><b>'+esc(i.title)+'</b><div class="meta" style="white-space:pre-wrap">'+esc(i.body||'')+'</div></div>'+acts('notes',i)+'</li>').join('')||empty('No notes yet.'),
+ recipes:a=>a.map(i=>'<li><div class="grow"><b>'+esc(i.name)+'</b>'+(i.kcal?'<span class="pill">'+esc(i.kcal)+' cal</span>':'')+'<div class="meta">'+esc((i.ingredients||'').split('\n').filter(Boolean).join(', '))+'</div><form class="row" data-logrec="'+esc(i.id)+'" style="margin-top:6px"><select class="inp" name="meal" style="width:auto">'+MEALS.map(m=>'<option>'+m+'</option>').join('')+'</select><button class="btn ghost sm">Log to today</button></form></div>'+acts('recipes',i)+'</li>').join('')||empty('Save recipes you make often.'),
+ shop:a=>a.map(i=>'<li class="'+(i.got?'done':'')+'"><input type="checkbox" class="chk" data-act="got" data-id="'+esc(i.id)+'"'+(i.got?' checked':'')+' aria-label="Got it"><div class="grow"><b>'+esc(i.name)+'</b>'+(i.fav?'<span class="pill">Usual</span>':'')+(query?'<span class="pill">'+esc(i.store)+'</span>':'')+'</div><button class="ic" data-act="fav" data-id="'+esc(i.id)+'">'+(i.fav?'Unstar':'Star')+'</button><button class="ic" data-act="del" data-k="shop" data-id="'+esc(i.id)+'" aria-label="Delete">✕</button></li>').join('')
+};
+
+/* ---------- pages ---------- */
+function wxIcon(c,s=44){c=+c||1;const sun='<circle cx="17" cy="17" r="8" fill="#ffffff"/>',moon='<path d="M22 9a9 9 0 1 0 9 11 7 7 0 0 1-9-11z" fill="#cfcfcf"/>',cloud='<path d="M12 34h20a7 7 0 0 0 0-14 9 9 0 0 0-17 3 6 6 0 0 0-3 11z" fill="#cfcfcf"/>',rain='<path d="M16 37l-2 4M23 37l-2 4M30 37l-2 4" stroke="#cfcfcf" stroke-width="2.5" stroke-linecap="round"/>';
+ const night=c>=33,clear=[1,2,30,31,33,34].includes(c),part=[3,4,5,35,36,37].includes(c),wet=(c>=12&&c<=29)||c>=39;
+ return'<svg width="'+s+'" height="'+s+'" viewBox="0 0 44 44" aria-hidden="true">'+(clear?(night?moon:'<circle cx="22" cy="22" r="10" fill="#ffffff"/>'):(part?(night?moon:sun)+cloud:cloud)+(wet?rain:''))+'</svg>'}
+let W={},wxFor='',wxW=[],wxOpen=false;
+let ACC='AccuWeather';
+function mcpMsg(e,name){const c=e&&e.code;if(window.PA_STANDALONE&&(c==='not_connected'||c==='server_not_connected'))return{t:'Connect '+name+' in Settings → Accounts.'};if(window.PA_STANDALONE&&c==='tool_error')return{t:(e.message||name+' had a problem.'),allow:1};return c==='approval_required'||c==='not_in_manifest'||c==='consent_required'?{t:name+' needs your OK to load here.',allow:1}:c==='server_not_connected'?{t:'Connect '+name+' in claude.ai Settings → Connectors.'}:c==='needs_reauth'?{t:'Reconnect '+name+' in claude.ai Settings → Connectors.'}:c==='selection_required'?{t:'Choose which '+name+' to use when claude.ai asks.'}:c==='not_granted'||c==='capability_disabled'?{t:name+' only loads when the app is opened in Claude.'}:{t:name+' didn’t respond ('+(c||'error')+'). Try again in a moment.',allow:1}}
+async function pickServer(names){try{const l=await mcp.listTools();const s=(l&&l.servers||[]).find(x=>names.includes(x.server));return s?s.server:names[0]}catch(e){return names[0]}}
+async function initWx(force){if(!mcp)return;const city=S.settings.city||'Santa Barbara, CA';if(wxFor===city&&!force)return;wxFor=city;
+ wxW.forEach(u=>{try{typeof u==='function'?u():u&&u.unsubscribe&&u.unsubscribe()}catch(e){}});wxW=[];W={loading:true};paintWx();
+ ACC=await pickServer(['AccuWeather','AccuWeather®']);
+ let key=S.settings.wxKeyFor===city?S.settings.wxKey:null;
+ try{
+  if(!key){const p=payload(await mcp.callTool(ACC,'widgets-search-claude',{queryParams:{query:city}}));const hit=p&&p.results&&p.results[0];if(!hit){W={err:{t:'Couldn’t find “'+city+'” — check the city name.'}};paintWx();return}key=String(hit.locationKey);S.settings.wxKey=key;S.settings.wxKeyFor=city;save('settings')}
+  const q={queryParams:{locationKey:key,unit:'imperial'}};
+  W.cur=payload(await mcp.callTool(ACC,'widgets-current-claude',q));W.loading=false;W.err=null;paintWx();
+ }catch(e){W={err:mcpMsg(e,'AccuWeather')};paintWx();return}
+ const q={queryParams:{locationKey:key,unit:'imperial'}};
+ const watch=(tool,k)=>{try{wxW.push(mcp.watchTool(ACC,tool,q,ev=>{if(ev.type==='data'){const p=payload(ev.result);if(p&&typeof p==='object'){W[k]=p;W.loading=false;W.err=null;paintWx()}}else if(ev.type==='error'&&!W[k]){W.err=mcpMsg(ev.error,'AccuWeather');paintWx()}},{refetchInterval:1800000}))}catch(e){}};
+ watch('widgets-current-claude','cur');watch('widgets-hourly-claude','hr');watch('widgets-daily-claude','day')}
+function paintWx(){const el=$('#wx'),pn=$('#wxp');const cc=W.cur&&W.cur.currentConditions,d0=W.day&&W.day.dailyForecast&&W.day.dailyForecast[0],w=S.weather;
+ const city=(W.cur&&W.cur.location&&W.cur.location.localizedName)||(S.settings.city||'').split(',')[0];
+ if(cc){el.innerHTML=wxIcon(cc.iconCode)+'<div class="t">'+esc(cc.temperatureValue)+'°</div><div><b>'+esc(cc.phrase||'')+'</b><small>'+(d0?'H '+esc(d0.day.temperature)+'° · L '+esc(d0.night.temperature)+'° · ':'')+esc(city)+'</small><small>'+(wxOpen?'Tap to close':'Tap for hourly & 10-day')+'</small></div>'}
+ else if(w&&w.city&&w.city.split(',')[0]===(S.settings.city||'').split(',')[0]){el.innerHTML=wxIcon(1)+'<div class="t">'+esc(w.hi??'')+'°</div><div><b>'+esc(w.cond||'')+'</b><small>'+(w.lo!=null?'Low '+esc(w.lo)+'° · ':'')+esc(w.city||'')+'</small><small>'+(W.err?esc(W.err.t):W.loading?'Loading live weather…':'From this morning’s brief')+'</small></div>'}
+ else el.innerHTML=wxIcon(1)+'<div><b>Weather · '+esc(city)+'</b><small>'+(W.err?esc(W.err.t):W.loading?'Loading live weather…':'Tap to open')+'</small></div>';
+ el.setAttribute('aria-expanded',wxOpen);pn.hidden=!wxOpen;if(!wxOpen)return;
+ let x='';const al=[];[W.cur,W.hr,W.day].forEach(o=>(o&&o.alerts||[]).forEach(a=>{if(!al.some(b=>b.name===a.name))al.push(a)}));
+ x+=al.map(a=>'<div class="alert"><b>'+esc(a.name)+'</b> · until '+esc(a.endDate||'')+' '+esc(a.endTime||'')+'</div>').join('');
+ const hr=W.hr&&W.hr.hourlyForecast||[];if(hr.length)x+='<h4>Next 12 hours</h4><div class="hrs">'+hr.slice(0,12).map(o=>'<div class="h">'+esc(o.dateTime)+wxIcon(o.icon,34)+'<b>'+esc(o.temperatureValue)+'°</b><small>'+esc(o.precip)+'</small></div>').join('')+'</div>';
+ const dd=W.day&&W.day.dailyForecast||[];if(dd.length)x+='<h4>10-day forecast</h4><ul class="dl">'+dd.map((o,i)=>'<li><span>'+(i===0?'Today':esc(o.longDisplayDate||o.dayOfWeek))+'</span>'+wxIcon(o.day.icon,28)+'<span>'+esc(o.day.phrase||'')+'</span><small class="r pp">'+esc(o.day.precip)+'</small><span class="r"><b>'+esc(o.day.temperature)+'°</b> / '+esc(o.night.temperature)+'°</span></li>').join('')+'</ul>';
+ if(cc){const e=cc.extended||{},aq=W.cur.currentAirQuality;x+='<h4>Right now</h4><div class="wxd"><div>Feels like<b>'+esc(cc.realFeel)+'</b></div><div>Wind<b>'+esc(e.wind||'—')+'</b></div><div>Humidity<b>'+esc(e.humidity||'—')+'</b></div><div>UV<b>'+esc(e.uv&&e.uv.category||'—')+'</b></div>'+(aq?'<div>Air quality<b>'+esc(aq.category)+'</b></div>':'')+'</div>'}
+ if(!hr.length&&!dd.length)x+='<p style="margin:0 0 8px">'+(W.err?esc(W.err.t)+(W.err.allow?' <button class="btn gold sm" id="wxallow" type="button">Load weather</button>':''):mcp?'Loading the forecast…':'Live hourly and 10-day weather shows when the app is opened in Claude with AccuWeather connected.')+'</p>';
+ x+='<form class="row" id="wxcity" style="margin-top:14px"><input class="inp" name="c" value="'+esc(S.settings.city)+'" aria-label="Your city" style="flex:1;min-width:160px;background:rgba(255,255,255,.12);border:0;color:#fff"><button class="btn gold sm">Change city</button>'+(window.PA_STANDALONE?'<button class="btn sm" type="button" id="wxhere" style="background:rgba(255,255,255,.15);color:#fff">Use my location</button>':'')+'</form>';
+ pn.innerHTML=x}
+function home(){
+ const now=new Date(),t=today(),ag=[];
+ S.reminders.forEach(r=>{if(days(r.when)<=0)ag.push({s:r.when,h:tm(r.when),sm:days(r.when)<0?'Overdue':'Reminder',t:r.title,late:new Date(r.when)<now,act:'<button class="btn ghost sm" data-act="rdone" data-id="'+esc(r.id)+'">Done</button>'})});
+ S.todos.filter(x=>!x.done&&x.due&&days(x.due)<=0).forEach(x=>ag.push({s:x.due+'T23',h:'To-do',sm:days(x.due)<0?'Overdue':'Due today',t:x.title,late:days(x.due)<0,act:'<input type="checkbox" class="chk" data-act="tog" data-id="'+esc(x.id)+'" aria-label="Done">'}));
+ const rg=S.regimen[new Date().getDay()];if(rg&&rg.name&&new Date().getDay()%6!==0)ag.push({s:t+'T22',h:'Workout',sm:'Today’s plan',t:rg.name,act:'<input type="checkbox" class="chk" data-act="fday" data-d="'+t+'"'+((S.fitlog[t]||{}).done?' checked':'')+' aria-label="Workout done">'});
+ ag.sort((a,b)=>a.s>b.s?1:-1);
+ const bdToday=S.people.filter(p=>!p.nobday&&days(nextBday(p))===0&&p.texted!==t.slice(0,4));
+ const bd=S.people.filter(p=>!p.nobday).map(p=>({p,n:days(nextBday(p))})).filter(x=>x.n>0&&x.n<=(+S.settings.heads||7)).sort((a,b)=>a.n-b.n);
+ const dts=S.dates.map(d=>({d,n:days(nextYearly(MONTHS.indexOf(d.month),d.day))})).filter(x=>x.n<=7);
+ const gifts=giftPrompts();
+ const bills=S.bills.map(b=>({b,d:billDue(b)})).filter(x=>!x.d.paid&&days(x.d.date)<=7).sort((a,b)=>a.d.date>b.d.date?1:-1);
+ const subs=S.subs.filter(s=>days(subNext(s))<=7);
+ const done=S.habitlog[t]||[];
+ const kc=sum(S.food.filter(f=>f.date===t),f=>f.kcal),goal=+S.settings.kcal;
+ const week=upcoming(7).filter(u=>u.date>t&&u.k!=='Birthday');
+ let h='';
+ bdToday.forEach(p=>h+='<div class="card banner full"><h3>It’s '+esc(p.name)+'’s birthday today</h3><p style="margin:0 0 10px">Send '+esc(p.rel?'your '+p.rel:'them')+' a text'+(p.phone?' at '+esc(p.phone):'')+'.</p>'+extras(p)+'<button class="btn" data-act="texted" data-id="'+esc(p.id)+'">I texted them</button></div>');
+ h+='<div class="card full">'+calendarHTML()+(ag.length?'<h3 style="margin-top:16px">Also due today</h3>':'')+'<ul class="list">'+(ag.map(a=>'<li><div class="when">'+esc(a.h)+'<small class="'+(a.late?'late':'')+'">'+esc(a.sm)+'</small></div><div class="grow"><b>'+esc(a.t)+'</b>'+(a.w?'<div class="meta">'+esc(a.w)+'</div>':'')+'</div>'+(a.act||'')+'</li>').join(''))+'</ul>'+(sample?'<div class="row" style="margin-top:12px"><button class="btn gold" data-act="plan">Plan my day with AI</button></div><div class="ai" data-ai="plan" hidden></div>':'')+'</div>';
+ const ts=S.appts.filter(a=>a.status==='Needs scheduling'&&(!a.by||days(a.by)<=30));if(ts.length)h+='<div class="card"><h3>Needs scheduling<small>'+ts.length+'</small></h3><ul class="list">'+R.tosched(ts)+'</ul></div>';
+ if(gifts.length)h+='<div class="card"><h3>Gift check</h3><ul class="list">'+gifts.map(({p,g,oc})=>'<li><div class="grow"><b>'+esc(oc.t)+' is '+rel(days(oc.date)).toLowerCase()+'.</b><div>Want to buy '+esc(p.name)+' the '+esc(g.idea)+'?</div><div class="meta" style="margin:4px 0 8px">'+shopLinks(g.idea)+'</div><div class="row"><button class="btn sm" data-act="gbought" data-p="'+esc(p.id)+'" data-id="'+esc(g.id)+'">Bought it</button><button class="btn ghost sm" data-act="gskip" data-p="'+esc(p.id)+'" data-id="'+esc(g.id)+'" data-d="'+esc(oc.date)+'">Not this time</button></div></div></li>').join('')+'</ul></div>';
+ if(bd.length||dts.length)h+='<div class="card"><h3>Coming up this week</h3><ul class="list">'+bd.map(({p,n})=>'<li><div class="when">'+esc(p.month)+' '+esc(p.day)+'<small>'+rel(n)+'</small></div><div class="grow"><b>'+esc(p.name)+'’s birthday</b><div class="meta">'+esc(p.rel||'')+(p.phone?' · '+esc(p.phone):'')+'</div>'+extras(p)+'</div></li>').join('')+dts.map(({d,n})=>'<li><div class="when">'+esc(d.month)+' '+esc(d.day)+'<small>'+rel(n)+'</small></div><div class="grow"><b>'+esc(d.title)+'</b></div></li>').join('')+'</ul></div>';
+ if(false)h+='<div class="card"><h3>Money due this week</h3><ul class="list">'+bills.map(({b,d})=>'<li><input type="checkbox" class="chk" data-act="paid" data-id="'+esc(b.id)+'" aria-label="Paid"><div class="grow"><b>'+esc(b.name)+'</b><span class="pill">'+money(b.amount)+'</span><div class="meta"><span class="'+(days(d.date)<=2?'late':'')+'">'+rel(days(d.date))+'</span>'+(b.autopay==='Yes'?' · autopay':'')+'</div></div></li>').join('')+subs.map(s=>'<li><div class="grow"><b>'+esc(s.name)+'</b><span class="pill">'+money(s.amount)+'</span><div class="meta">Renews '+rel(days(subNext(s))).toLowerCase()+'</div></div></li>').join('')+'</ul></div>';
+ h+='<div class="card"><h3>Routines & habits<small>'+S.habits.filter(x=>done.includes(x.id)).length+' of '+S.habits.length+'</small></h3>'+(S.habits.length?habitChecks(t,false):'<p class="empty">Set up your routines in the Habits tab.</p>')+'</div>';
+ h+='<div class="card"><h3>Health today</h3><div class="meta">Calories</div><div class="big">'+kc+(goal?' <span style="font-size:20px">/ '+goal+'</span>':'')+'</div>'+(goal?'<div class="bar"><i class="'+(kc>goal?'over':'')+'" style="width:'+Math.min(100,kc/goal*100)+'%"></i></div>':'<div class="meta">Set a daily goal in Health → Diet</div>')+'<div class="meta" style="margin-top:10px">Steps: <b>'+(S.steps[t]?Number(S.steps[t]).toLocaleString():'—')+'</b> · Workouts this week: <b>'+[0,1,2,3,4].filter(i=>(S.fitlog[addD(weekStart(),i)]||{}).done).length+' / 5</b>'+(SV?'<br>Strava this week: <b>'+svWeek().n+'</b> activities · <b>'+hms(svWeek().t)+'</b>':'')+'</div></div>';
+ h+='<div class="card"><h3>Next 7 days</h3><ul class="list">'+(week.map(u=>'<li><div class="when">'+dow(u.date)+'<small>'+fmtD(u.date)+(u.time?' '+tm(u.time):'')+'</small></div><div class="grow"><b>'+esc(u.t)+'</b><div class="meta">'+esc(u.k)+(u.where?' · '+esc(u.where):'')+'</div></div></li>').join('')||empty('Nothing booked this week.'))+'</ul></div>';
+ return'<div class="grid">'+h+'</div>'}
+const extras=p=>{const g=(p.gifts||[]).filter(x=>!x.bought),pl=p.plans||[];return(pl.length?'<div class="meta">Plans: '+pl.map(x=>esc(x.text)).join('; ')+'</div>':'')+(g.length?'<div class="meta">Gift ideas: '+g.map(x=>esc(x.idea)).join('; ')+'</div>':'')};
+function streak(hid){let n=0,d=today();if(!(S.habitlog[d]||[]).includes(hid))d=addD(d,-1);while((S.habitlog[d]||[]).includes(hid)){n++;d=addD(d,-1)}return n}
+function todosP(){const s=subOf('todos');return head('To-dos','Your list, plus reminders you can change anytime.')+subtabs('todos')+(s==='To-dos'?form('todos')+'<div class="card"><ul class="list">'+R.todos(S.todos)+'</ul></div>':form('reminders')+'<div class="card"><ul class="list">'+R.reminders(S.reminders)+'</ul></div>')}
+function eventsP(){const s=subOf('events');let h=head('Events','Personal appointments, things to book, birthdays, anniversaries and holidays.')+subtabs('events');
+ const ef=editing&&editing.k==='appts';const rep='<label class="f">Repeats<select name="repeat">'+REPO.map(x=>'<option>'+x+'</option>').join('')+'</select></label>',typ='<label class="f">Type<select name="cat">'+ACATS.map(c=>'<option>'+c+'</option>').join('')+'</select></label>';
+ if(s==='To schedule')h+='<p class="sub">Things to book and upkeep that comes around again — oil change, tires, dentist, insurance. Add when you last did it and how often, and it’ll remind you when it’s due.</p>'+(ef?form('appts'):'<form class="add card" data-appt="Needs scheduling"><label class="f">Needs scheduling<input name="title" required placeholder="Oil change, dentist cleaning…"></label>'+typ+'<label class="f">Last done (optional)<input name="last" type="date"></label>'+rep+'<label class="f">Due / book by (optional)<input name="by" type="date"></label><label class="f">Notes<input name="notes"></label><div><button class="btn">Add</button></div></form>')+'<div class="card"><h3>Due soon<small>next 30 days</small></h3><ul class="list">'+R.tosched(S.appts.filter(a=>!a.by||days(a.by)<=30))+'</ul></div>'+(S.appts.some(a=>a.status==='Needs scheduling'&&a.by&&days(a.by)>30)?'<div class="card"><h3>Later</h3><ul class="list">'+R.tosched(S.appts.filter(a=>a.by&&days(a.by)>30))+'</ul></div>':'');
+ if(s==='Confirmed / booked')h+='<p class="sub">Booked personal appointments. Tap “Add to Google Calendar” to send one to your calendar.</p>'+(ef?form('appts'):'<form class="add card" data-appt="Booked"><label class="f">Booked appointment<input name="title" required placeholder="Haircut, dentist…"></label>'+typ+'<label class="f">Date<input name="date" type="date" required></label><label class="f">Time<input name="time" type="time"></label><label class="f">Where<input name="where"></label>'+rep+(mcp?'<label class="f" style="display:flex;gap:8px;align-items:center;min-height:44px"><input type="checkbox" name="cal" class="chk"> Add to Google Calendar</label>':'')+'<div><button class="btn">Add</button></div></form>')+'<div class="card"><ul class="list">'+R.appts(S.appts)+'</ul></div>';
+ if(s==='Birthdays')h+='<p class="sub">Birthdays show on Home a week out, and you get a phone reminder a week before and on the day. Add gift ideas and plans to anyone here, or just tell the assistant (“dinner Saturday plan for Mom”).</p>'+form('people')+'<div class="card"><ul class="list">'+R.people(S.people)+'</ul></div>';
+ if(s==='Anniversaries')h+=form('dates')+'<div class="card"><ul class="list">'+R.dates(S.dates)+'</ul></div>';
+ if(s==='Holidays'){const HL=S.hlists||{};h+='<p class="sub">Upcoming holidays. Open one to keep a list for it — Christmas gifts, Thanksgiving to-bring, anything.</p><div class="card">'+holidays().slice(0,14).map(x=>{const key=x.t+' '+x.date.slice(0,4),L=HL[key]||[];return'<details class="day"'+(L.length?' open':'')+'><summary><span><b>'+esc(x.t)+'</b> <span class="meta">'+fmtD(x.date)+' · '+dow(x.date)+'</span></span><span class="meta">'+rel(days(x.date))+(L.length?' · '+L.filter(i=>!i.done).length+' to do':'')+'</span></summary><ul class="list">'+L.map(i=>'<li class="'+(i.done?'done':'')+'"><input type="checkbox" class="chk" data-act="hli" data-h="'+esc(key)+'" data-id="'+esc(i.id)+'"'+(i.done?' checked':'')+' aria-label="Done"><div class="grow"><b>'+esc(i.text)+'</b></div><button class="ic" data-act="hld" data-h="'+esc(key)+'" data-id="'+esc(i.id)+'" aria-label="Remove">✕</button></li>').join('')+'</ul><form class="row" data-hl="'+esc(key)+'" style="padding:0 0 12px 22px"><input class="inp" name="t" placeholder="Add to '+esc(x.t)+' list (e.g. Mom — scarf)" style="flex:1;min-width:160px"><button class="btn ghost sm">Add</button></form></details>'}).join('')+'</div><p class="note">Holidays are '+(S.settings.holidays==='Off'?'hidden from':'shown on')+' Home — change it in Settings.</p>'}
+ return h}
+const HG=['Morning routine','Daily habits','Evening routine'];const hgOf=x=>HG.includes(x.group)?x.group:'Daily habits';
+function habitChecks(d,fut){const l=S.habitlog[d]||[];return HG.map(g=>{const its=S.habits.filter(x=>hgOf(x)===g);if(!its.length)return'';return'<div class="hg"><div class="meta" style="font-weight:600;margin:6px 0 2px">'+g+'</div><ul class="list">'+its.map(x=>{const on=l.includes(x.id);return'<li class="'+(on?'done':'')+'"><input type="checkbox" class="chk" data-act="hab" data-d="'+d+'" data-id="'+esc(x.id)+'"'+(on?' checked':'')+(fut?' disabled':'')+' aria-label="'+esc(x.name)+'"><div class="grow"><b>'+esc(x.name)+'</b></div></li>'}).join('')+'</ul></div>'}).join('')}
+function habitsP(){const t=today(),ws=weekStart(hwk),H=S.habits,wk=[...Array(7)].map((_,i)=>addD(ws,i));
+ let h=head('Habits','Your morning routine, daily habits and evening routine. Set them once — they carry over every day until you change them.');
+ h+='<form class="add card" data-form="habits"><label class="f">Add to your list<input name="name" required placeholder="e.g. Make bed, Vitamins, Journal"></label><label class="f">Where<select name="group">'+HG.map(g=>'<option>'+g+'</option>').join('')+'</select></label><div><button class="btn">Add</button></div></form>';
+ h+='<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="btn ghost sm" data-act="hwk" data-d="-1">‹ Last week</button><b>Week of '+fmtD(ws)+'</b><button class="btn ghost sm" data-act="hwk" data-d="1"'+(hwk>=0?' disabled':'')+'>Next week ›</button></div>';
+ h+='<div class="card">'+(H.length?wk.map(d=>{const l=S.habitlog[d]||[],c=H.filter(x=>l.includes(x.id)).length,fut=d>t;return'<details class="day"'+(d===t?' open':'')+'><summary><span><b>'+WD[pd(d).getDay()]+'</b> <span class="meta">'+fmtD(d)+(d===t?' · today':'')+'</span></span><span class="meta '+(c===H.length&&!fut?'okc':'')+'">'+(fut?'':c+' / '+H.length)+'</span></summary><div style="padding:0 0 10px 22px">'+habitChecks(d,fut)+'</div></details>'}).join(''):'<p class="empty">Add your morning routine, daily habits and evening routine above.</p>')+'</div>';
+ if(H.length)h+='<div class="card"><h3>Your list<small>this week</small></h3>'+HG.map(g=>{const its=H.filter(x=>hgOf(x)===g);return its.length?'<div class="meta" style="font-weight:600;margin-top:8px">'+g+'</div><ul class="list">'+its.map(x=>{const n=wk.filter(d=>(S.habitlog[d]||[]).includes(x.id)).length;return'<li><div class="grow"><b>'+esc(x.name)+'</b><div class="meta">'+streak(x.id)+' day streak</div></div><span>'+n+' / 7</span>'+acts('habits',x)+'</li>'}).join('')+'</ul>':''}).join('')+'</div>';
+ return h}
+function goalsP(){const s=subOf('goals'),per=goalPer(s);const label=s==='Weekly'?'the week of '+fmtD(per):s==='Monthly'?new Date().toLocaleDateString([],{month:'long',year:'numeric'}):per;const list=S.goals.filter(g=>g.horizon===s&&g.period===per);const past=S.goals.filter(g=>g.horizon===s&&g.period<per).sort((x,y)=>x.period<y.period?1:-1);
+ return head('Goals','Weekly, monthly and annual goals. Tick them off when you hit them.')+subtabs('goals')+form('goals')+'<div class="card"><h3>'+esc(s)+' goals · '+esc(label)+'<small>'+list.filter(g=>g.done).length+' of '+list.length+' done</small></h3><ul class="list">'+R.goals(list)+'</ul></div>'+(past.length?'<details class="card"><summary>Past '+s.toLowerCase()+' goals ('+past.length+')</summary><ul class="list">'+R.goals(past)+'</ul></details>':'')}
+function dietP(){const d=dDay||today(),items=S.food.filter(f=>f.date===d),goal=+S.settings.kcal||0,food=sum(items,f=>f.kcal),recent=[...new Map(S.food.slice(-60).reverse().map(f=>[f.name.toLowerCase(),f])).values()].slice(0,10);
+ let h='<div class="card" style="margin-bottom:18px"><div class="row" style="justify-content:space-between"><button class="btn ghost sm" data-act="dday" data-d="-1">‹ Prev</button><b>'+(d===today()?'Today':esc(dow(d)+', '+fmtD(d)))+'</b><button class="btn ghost sm" data-act="dday" data-d="1">Next ›</button></div>'+
+ '<form class="row" data-kcal="1" style="margin:14px 0"><label class="f" style="flex:1">Daily goal (calories)<input class="inp" name="kcal" type="number" value="'+esc(S.settings.kcal)+'" placeholder="e.g. 2,000"></label><button class="btn ghost" style="align-self:end">Set</button></form>'+
+ '<div class="mfp"><div><b>'+(goal||'—')+'</b><span>Goal</span></div><i>−</i><div><b>'+food+'</b><span>Food</span></div><i>=</i><div><b class="'+(goal&&food>goal?'late':'')+'">'+(goal?goal-food:'—')+'</b><span>Remaining</span></div></div>'+(goal?'<div class="bar"><i class="'+(food>goal?'over':'')+'" style="width:'+Math.min(100,food/goal*100)+'%"></i></div>':'')+'</div><div class="grid">';
+ MEALS.forEach(m=>{const its=items.filter(f=>f.meal===m);h+='<div class="card meal"><h3>'+m+'<small>'+sum(its,f=>f.kcal)+' cal</small></h3><ul class="list">'+its.map(f=>'<li><div class="grow">'+esc(f.name)+'</div><span>'+esc(f.kcal||0)+'</span><button class="ic" data-act="del" data-k="food" data-id="'+esc(f.id)+'" aria-label="Remove">✕</button></li>').join('')+'</ul><form class="inl" data-food="'+m+'"><input class="inp" name="name" placeholder="Add food" required list="recentfoods"><input class="inp" name="kcal" type="number" placeholder="Cal"><button class="btn sm">Add</button></form></div>'});
+ h+='</div><datalist id="recentfoods">'+recent.map(f=>'<option value="'+esc(f.name)+'">').join('')+S.recipes.map(r=>'<option value="'+esc(r.name)+'">').join('')+'</datalist><p class="note">Type a recent food or a saved recipe and its calories fill in.</p>';return h}
+function recipesP(){const ws=weekStart(wkOff);let rows='';for(let i=0;i<7;i++){const d=addD(ws,i),p=S.plan[d]||{};rows+='<tr><th>'+dow(d)+' '+fmtD(d)+'</th>'+['Breakfast','Lunch','Dinner'].map(m=>'<td><select data-plan="'+d+'|'+m+'" aria-label="'+m+' '+fmtD(d)+'"><option value="">'+m+'…</option>'+S.recipes.map(r=>'<option value="'+esc(r.id)+'"'+(p[m]===r.id?' selected':'')+'>'+esc(r.name)+'</option>').join('')+'</select></td>').join('')+'</tr>'}
+ return'<div class="card" style="margin-bottom:18px"><h3>Meal plan<small><button class="ic" data-act="wk" data-d="-1">‹</button> Week of '+fmtD(ws)+' <button class="ic" data-act="wk" data-d="1">›</button></small></h3>'+(S.recipes.length?'<table class="plan"><thead><tr><th></th><th>Breakfast</th><th>Lunch</th><th>Dinner</th></tr></thead><tbody>'+rows+'</tbody></table><div class="row" style="margin-top:12px"><button class="btn gold" data-act="plan2shop">Add this week’s ingredients to shopping</button>'+(sample?'<button class="btn ghost" data-act="planai">Suggest a week of meals</button>':'')+'</div><div class="ai" data-ai="planai" hidden></div>':'<p class="empty">Add a recipe below, then plan your week here.</p>')+'</div>'+form('recipes')+'<div class="card"><h3>Recipe box</h3><ul class="list">'+R.recipes(S.recipes)+'</ul></div>'}
+let SV=null,svErr=null,svOk=false,svH=null;
+async function watchStrava(){if(!mcp||svH)return;const inp={first:40,use_preferred_units:true};
+ if(!svOk){try{SV=payload(await mcp.callTool('Strava','list_activities',inp));svOk=true;svErr=null;render()}catch(e){svErr=mcpMsg(e,'Strava');render();return}}
+ try{svH=mcp.watchTool('Strava','list_activities',inp,ev=>{if(ev.type==='data'){const p=payload(ev.result);if(p&&p.activities){SV=p;svErr=null;render()}}else if(ev.type==='error'&&!SV){svErr=mcpMsg(ev.error,'Strava');render()}},{refetchInterval:900000})}catch(e){}}
+const svActs=()=>(SV&&SV.activities)||[];
+const hms=s=>{s=+s||0;const h=Math.floor(s/3600),m=Math.round((s%3600)/60);return h?h+'h '+m+'m':m+'m'};
+const strain=a=>{const m=String(a.description||'').match(/([\d.]+)\s*Strain/i);return m?m[1]:''};
+function svWeek(){const ws=weekStart(),acts=svActs().filter(a=>String(a.start_local).slice(0,10)>=ws);return{n:acts.length,t:sum(acts,a=>a.summary&&a.summary.moving_time),mi:sum(acts,a=>a.summary&&a.summary.distance),cal:sum(acts,a=>a.summary&&a.summary.total_calories),acts}}
+function stravaCard(){if(!mcp)return'';if(svErr)return'<div class="card" style="margin-bottom:18px"><h3>Strava & Whoop</h3><p class="meta">'+esc(svErr.t)+'</p>'+(svErr.allow?'<button class="btn sm" data-act="svallow">Load Strava</button>':'')+'</div>';
+ if(!SV)return'<div class="card" style="margin-bottom:18px"><h3>Strava & Whoop</h3><p class="meta">Loading your activities…</p></div>';
+ const w=svWeek(),acts=svActs().slice(0,12);
+ return'<div class="card" style="margin-bottom:18px"><h3>Strava & Whoop<small>this week</small></h3><div class="row" style="gap:22px;margin-bottom:6px"><div><div class="big" style="font-size:30px">'+w.n+'</div><div class="meta">activities</div></div><div><div class="big" style="font-size:30px">'+hms(w.t)+'</div><div class="meta">moving</div></div>'+(w.mi?'<div><div class="big" style="font-size:30px">'+w.mi.toFixed(1)+'</div><div class="meta">miles</div></div>':'')+(w.cal?'<div><div class="big" style="font-size:30px">'+Math.round(w.cal)+'</div><div class="meta">calories</div></div>':'')+'</div>'+
+ '<ul class="list">'+acts.map(a=>{const s=a.summary||{},d=String(a.start_local).slice(0,10),st=strain(a);return'<li><div class="when">'+fmtD(d)+'<small>'+esc(dow(d))+' '+tm(a.start_local)+'</small></div><div class="grow"><b>'+esc(a.name)+'</b>'+(st?'<span class="pill">'+esc(st)+' strain</span>':'')+'<div class="meta">'+esc(a.sport_type)+' · '+hms(s.moving_time)+(s.distance?' · '+esc(s.distance_display||s.distance+' mi'):'')+(s.avg_pace_display?' · '+esc(s.avg_pace_display):'')+(s.total_calories?' · '+Math.round(s.total_calories)+' cal':'')+'</div></div><a class="ic" style="display:grid;place-items:center;text-decoration:none" href="https://www.strava.com/activities/'+encodeURIComponent(a.id)+'" target="_blank" rel="noopener">Open</a></li>'}).join('')+'</ul></div>'}
+function fitnessP(){const t=today(),ws=weekStart(fwk),days5=[0,1,2,3,4].map(i=>addD(ws,i));const doneN=days5.filter(d=>(S.fitlog[d]||{}).done).length,planned=days5.filter(d=>(S.regimen[pd(d).getDay()]||{}).name).length;
+ let h=stravaCard()+'<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="btn ghost sm" data-act="fwk" data-d="-1">‹ Last week</button><b>Week of '+fmtD(ws)+' · '+doneN+' / '+(planned||5)+' done</b><button class="btn ghost sm" data-act="fwk" data-d="1">Next week ›</button></div><div class="card" style="margin-bottom:18px">';
+ h+=days5.map(d=>{const r=S.regimen[pd(d).getDay()]||{},L=S.fitlog[d]||{},ex=(r.ex||'').split('\n').map(x=>x.trim()).filter(Boolean),fut=d>t;
+  return'<details class="day"'+(d===t?' open':'')+'><summary><span><b>'+WD[pd(d).getDay()]+'</b> <span class="meta">'+fmtD(d)+(d===t?' · today':'')+'</span><br><span>'+esc(r.name||'Rest / not planned')+'</span></span>'+(r.name?'<label class="row" style="gap:6px" onclick="event.stopPropagation()"><span class="meta">Done</span><input type="checkbox" class="chk" data-act="fday" data-d="'+d+'"'+(L.done?' checked':'')+(fut?' disabled':'')+' aria-label="Workout done '+fmtD(d)+'"></label>':'')+'</summary>'+
+  (ex.length?'<ul class="list">'+ex.map((x,j)=>{const on=(L.ex||[]).includes(j);return'<li class="'+(on?'done':'')+'"><input type="checkbox" class="chk" data-act="fex" data-d="'+d+'" data-j="'+j+'"'+(on?' checked':'')+(fut?' disabled':'')+' aria-label="'+esc(x)+'"><div class="grow"><b>'+esc(x)+'</b></div></li>'}).join('')+'</ul>':'<p class="meta" style="padding:0 0 10px 22px">'+(r.name?'No exercises listed — add them in your weekly plan below.':'Add a workout for this day in your weekly plan below.')+'</p>')+'</details>'}).join('')+'</div>';
+ h+='<details class="card" style="margin-bottom:18px"'+(Object.keys(S.regimen).length?'':' open')+'><summary><b>My weekly plan</b> — Monday to Friday. You’ll get a reminder Sunday evening to review it.</summary><form data-reg="1" style="margin-top:12px">'+[1,2,3,4,5].map(d=>{const r=S.regimen[d]||{};return'<div class="add" style="margin-bottom:10px"><label class="f">'+WD[d]+'<input class="inp" name="n'+d+'" value="'+esc(r.name||'')+'" placeholder="e.g. Push day, Run, Rest"></label><label class="f">Exercises (one per line)<textarea class="inp" name="e'+d+'" style="min-height:44px" placeholder="Bench press 4x8&#10;Push-ups 3x20">'+esc(r.ex||'')+'</textarea></label></div>'}).join('')+'<button class="btn">Save plan</button></form></details>';
+ h+='<div class="card"><h3>Steps</h3><form class="row" data-steps="1"><label class="f" style="flex:1">Steps today<input class="inp" name="steps" type="number" value="'+esc(S.steps[t]||'')+'"></label><button class="btn ghost" style="align-self:end">Save</button></form><p class="note">Strava (with your Whoop workouts) syncs above. Steps aren’t in Strava, so enter them here.</p></div>';
+ return h}
+function healthP(){const s=subOf('health');return head('Health','Diet and fitness.')+subtabs('health')+(s==='Fitness'?fitnessP():'<div class="subs2">'+subtabs('diet')+'</div>'+(subOf('diet')==='Food diary'?dietP():recipesP()))}
+function shopP(){const st=S.settings.stores;if(!st.includes(store))store=st[0];const mine=S.shop.filter(i=>i.store===store),on=mine.filter(i=>i.on),favOff=mine.filter(i=>i.fav&&!i.on);
+ let h=head('Shopping','A separate list for each store. Star your usuals so they’re one tap away.')+'<div class="scroll subs">'+st.map(s=>'<button data-act="store" data-v="'+esc(s)+'" class="'+(s===store?'on':'')+'">'+esc(s)+' <span class="meta">'+S.shop.filter(i=>i.store===s&&i.on&&!i.got).length+'</span></button>').join('')+'<button data-act="addstore">+ Store</button></div>';
+ h+='<form class="add card" data-shop="1"><label class="f">Item<input name="name" required placeholder="Add to '+esc(store)+'"></label><label class="f">Type<select name="kind"><option>Groceries</option><option>Household</option></select></label><label class="f" style="flex-direction:row;display:flex;gap:8px;align-items:center;min-height:44px"><input type="checkbox" name="fav" class="chk"> Usual item</label><div><button class="btn">Add</button></div></form>';
+ if(favOff.length)h+='<div class="card" style="margin-bottom:18px"><h3>Your usuals at '+esc(store)+'<small><button class="btn ghost sm" data-act="allfav">Add all</button></small></h3><div class="chips">'+favOff.map(i=>'<button class="chip fav" data-act="refav" data-id="'+esc(i.id)+'">+ '+esc(i.name)+'</button>').join('')+'</div></div>';
+ h+='<div class="grid">'+['Groceries','Household'].map(k=>{const its=on.filter(i=>i.kind===k).sort((a,b)=>a.got-b.got);return'<div class="card"><h3>'+k+'<small>'+its.filter(i=>!i.got).length+' left</small></h3><ul class="list">'+(R.shop(its)||empty('Nothing on the list.'))+'</ul></div>'}).join('')+'</div>';
+ if(on.some(i=>i.got))h+='<div class="row" style="margin-top:14px"><button class="btn ghost" data-act="clrgot">Clear checked items</button><span class="meta">Usual items go back to your usuals.</span></div>';
+ return h}
+function moneyP(){const s=subOf('money');let h=head('Money','Bills, subscriptions and spending. Bills due within 2 days are flagged and go in your morning brief.')+subtabs('money');
+ if(s==='Bills'){const tot=sum(S.bills,b=>b.amount),left=sum(S.bills.filter(b=>!billDue(b).paid),b=>b.amount);h+='<div class="card" style="margin-bottom:18px"><div class="meta">Still to pay this month</div><div class="big">'+money(left)+'</div><div class="meta">of '+money(tot)+' in monthly bills</div></div>'+form('bills')+'<div class="card"><ul class="list">'+R.bills(S.bills)+'</ul></div>'}
+ if(s==='Subscriptions'){const mo=sum(S.subs,x=>x.cycle==='Yearly'?x.amount/12:x.amount);h+='<div class="card" style="margin-bottom:18px"><div class="meta">Subscriptions cost you</div><div class="big">'+money(mo)+' <span style="font-size:20px">/ month</span></div><div class="meta">'+money(mo*12)+' a year</div></div>'+form('subs')+'<div class="card"><ul class="list">'+R.subs(S.subs)+'</ul></div>'}
+ if(s==='Spending'){const m=today().slice(0,7),mine=S.spend.filter(x=>String(x.date).startsWith(m)),tot=sum(mine,x=>x.amount),B=S.settings.budgets||{},btot=sum(Object.values(B),v=>v);
+  h+='<div class="card" style="margin-bottom:18px"><div class="meta">Spent in '+new Date().toLocaleDateString([],{month:'long'})+'</div><div class="big">'+money(tot)+(btot?' <span style="font-size:20px">/ '+money(btot)+'</span>':'')+'</div>'+(btot?'<div class="bar"><i class="'+(tot>btot?'over':'')+'" style="width:'+Math.min(100,tot/btot*100)+'%"></i></div>':'')+
+  '<ul class="list" style="margin-top:10px">'+CATS.filter(c=>B[c]||mine.some(x=>x.cat===c)).map(c=>{const sp=sum(mine.filter(x=>x.cat===c),x=>x.amount),b=+B[c]||0;return'<li style="display:block"><div class="row" style="justify-content:space-between"><b>'+c+'</b><span>'+money(sp)+(b?' / '+money(b):'')+'</span></div>'+(b?'<div class="bar"><i class="'+(sp>b?'over':'')+'" style="width:'+Math.min(100,sp/b*100)+'%"></i></div>':'')+'</li>'}).join('')+'</ul>'+
+  '<details style="margin-top:10px"><summary>Set monthly budgets</summary><form class="add" data-budget="1" style="margin-top:10px">'+CATS.map(c=>'<label class="f">'+c+'<input name="'+esc(c)+'" type="number" step="any" value="'+esc(B[c]||'')+'"></label>').join('')+'<div><button class="btn">Save budgets</button></div></form></details></div>'+form('spend')+'<div class="card"><ul class="list">'+R.spend(mine)+'</ul></div>'}
+ return h}
+let vImp=null,V=null,vkey=null,vShow={},vEdit=null,vErr='',vT=null;
+const b64=u=>{let s='';new Uint8Array(u).forEach(c=>s+=String.fromCharCode(c));return btoa(s)},ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function vDerive(pass,salt){const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function vSave(){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},vkey,new TextEncoder().encode(JSON.stringify(V)));S.vault={salt:S.vault.salt,iv:b64(iv),ct:b64(ct)};save('vault');vTouch()}
+function vLock(){vImp=null;V=null;vkey=null;vShow={};vEdit=null;clearTimeout(vT);if(tab==='notes')render()}
+function vTouch(){clearTimeout(vT);vT=setTimeout(vLock,300000)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&V)vLock()});
+function vParse(txt){const clean=s=>s.replace(/\[([^\]]*)\]\(mailto:[^)]*\)/g,'$1').replace(/^\s*(username|user|email on account|email|login|password|pw)\s*[:\-–]\s*/i,'').trim();
+ return txt.replace(/\r/g,'').split(/\n\s*\n+/).map(b=>b.split('\n').map(l=>l.trim()).filter(Boolean)).filter(b=>b.length).map(L=>{let title='';const f=L[0];if(/:\s*$/.test(f)||(!/@/.test(f)&&L.length>=3&&/\s/.test(f))||(!/@/.test(f)&&/^[A-Z]/.test(f)&&L.length>=3)){title=f.replace(/:\s*$/,'').trim();L=L.slice(1)}else if(/[:\-–]\s*\S/.test(f)&&!/@/.test(f.split(/[:\-–]/)[0])&&/^(.+?)\s*(info)?\s*[:\-–]\s*$/i.test(f)){title=f;L=L.slice(1)}
+  if(!title&&L.length===2&&!/@/.test(L[0])&&/^[A-Z]|\s/.test(L[0])&&!/^[A-Z][a-z]*\d/.test(L[0]))return{id:uid(),title:L[0].replace(/:\s*$/,''),user:'',pass:clean(L[1]),note:''};const user=L[0]?clean(L[0]):'',pass=L[1]?clean(L[1]):'',note=L.slice(2).map(clean).join('\n');return{id:uid(),title:title||user||'Untitled',user,pass,note}})}
+function vaultP(){if(!(window.crypto&&crypto.subtle))return'<div class="card"><p>Locked notes need a secure connection, which isn’t available in this view.</p></div>';
+ if(!S.vault)return'<div class="card"><h3>Set a passcode</h3><p class="meta">Everything in Locked is encrypted with this passcode before it’s saved. If you forget it, the locked notes can’t be recovered.</p><form class="add" data-vcreate="1" style="margin-top:10px"><label class="f">Passcode<input name="p1" type="password" minlength="6" required autocomplete="new-password"></label><label class="f">Again<input name="p2" type="password" minlength="6" required autocomplete="new-password"></label><div><button class="btn">Create</button></div></form>'+(vErr?'<p class="late">'+esc(vErr)+'</p>':'')+'</div>';
+ if(!V)return'<div class="card"><h3>Locked</h3><form class="row" data-vunlock="1"><input class="inp" name="p" type="password" placeholder="Passcode" required autocomplete="current-password" style="flex:1;min-width:160px"><button class="btn">Unlock</button></form>'+(vErr?'<p class="late">'+esc(vErr)+'</p>':'')+'</div>';
+ const it=vEdit?V.find(x=>x.id===vEdit):null,f=(n,l)=>'<label class="f">'+l+'<input name="'+n+'" value="'+esc(it?it[n]:'')+'" autocomplete="off"></label>';
+ const imp=vImp?'<div class="card" style="margin-bottom:18px"><h3>Ready to lock in<small>'+vImp.length+' entries</small></h3><ul class="list">'+vImp.map(x=>'<li><div class="grow"><b>'+esc(x.title)+'</b><div class="meta">'+esc(x.user)+(x.pass?' · ••••••':' · no password found')+(x.note?' · +notes':'')+'</div></div></li>').join('')+'</ul><div class="row" style="margin-top:10px"><button class="btn" data-act="vimpsave">Lock all '+vImp.length+' in</button><button class="btn ghost" data-act="vimpx">Cancel</button></div><p class="meta" style="margin-top:8px">Each block becomes one entry: first line = name, then username, then password; anything else goes in notes. You can edit any entry after.</p></div>':'<details class="card" style="margin-bottom:18px"><summary><b>Paste a list to import</b></summary><form data-vimp="1" style="margin-top:10px"><textarea class="inp" name="t" style="width:100%;min-height:160px" placeholder="Netflix:&#10;me@email.com&#10;password&#10;&#10;Spotify:&#10;…" autocomplete="off" spellcheck="false"></textarea><div class="row" style="margin-top:8px"><button class="btn">Preview</button></div></form></details>';
+ return imp+'<div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="meta">Unlocked · locks after 5 minutes</span><button class="btn ghost sm" data-act="vlock">Lock now</button></div><form class="add card" data-vadd="1">'+f('title','Name (e.g. Netflix)')+f('user','Username / email')+f('pass','Password')+'<label class="f" style="grid-column:1/-1">Notes<textarea name="note">'+esc(it?it.note:'')+'</textarea></label><div class="row"><button class="btn">'+(it?'Save':'Add')+'</button>'+(it?'<button type="button" class="btn ghost" data-act="vcancel">Cancel</button>':'')+'</div></form>'+
+ '<div class="card"><ul class="list">'+(V.map(x=>'<li><div class="grow"><b>'+esc(x.title)+'</b>'+(x.user?'<div class="meta">'+esc(x.user)+'</div>':'')+(x.pass?'<div style="font-family:ui-monospace,monospace;margin-top:4px">'+(vShow[x.id]?esc(x.pass):'••••••••')+'</div>':'')+(x.note?'<div class="meta" style="white-space:pre-wrap">'+esc(x.note)+'</div>':'')+'<div class="row" style="margin-top:6px">'+(x.pass?'<button class="btn ghost sm" data-act="vshow" data-id="'+esc(x.id)+'">'+(vShow[x.id]?'Hide':'Show')+'</button><button class="btn ghost sm" data-act="vcopy" data-id="'+esc(x.id)+'">Copy password</button>':'')+'</div></div><button class="ic" data-act="vedit" data-id="'+esc(x.id)+'">Edit</button><button class="ic" data-act="vdel" data-id="'+esc(x.id)+'" aria-label="Delete">✕</button></li>').join('')||empty('Nothing locked yet.'))+'</ul></div>'}
+function notesP(){const s=subOf('notes');return head('Notes','Quick notes, plus a locked section for passwords.')+subtabs('notes')+(s==='Locked'?vaultP():form('notes')+'<div class="card"><ul class="list">'+R.notes(S.notes)+'</ul></div>')}
+
+let paSt=null;
+function standaloneCard(){if(!window.PA)return'';const ps=PA.push.status(),st=paSt||{};
+ const pmsg=ps==='granted'?'On for this device.':ps==='denied'?'Blocked — turn on notifications for this app in your phone’s Settings.':ps==='install-first'?'On iPhone: tap Share → Add to Home Screen, open the app from the icon, then come back here.':ps==='unsupported'?'This browser can’t do push notifications.':'Off on this device.';
+ return'<div class="card" style="margin-bottom:18px"><h3>Notifications</h3><p class="meta" style="margin:0 0 10px">'+pmsg+'</p><div class="row">'+(ps==='default'?'<button class="btn" data-act="pushon">Turn on notifications</button>':'')+(ps==='granted'?'<button class="btn ghost" data-act="pushtest">Send a test</button>':'')+'</div>'+
+ '<form class="row" data-brief="1" style="margin-top:12px"><label class="f" style="flex:1">Morning brief time<input class="inp" name="t" type="time" value="'+esc(S.settings.briefTime||'07:00')+'"></label><button class="btn ghost" style="align-self:end">Save</button></form></div>'+
+ '<div class="card" style="margin-bottom:18px"><h3>Accounts</h3><ul class="list">'+[['gcal','Google Calendar'],['strava','Strava']].map(([k,l])=>'<li><div class="grow"><b>'+l+'</b><div class="meta">'+(st[k]?'Connected':'Not connected')+'</div></div><button class="btn '+(st[k]?'ghost ':'')+'sm" data-act="paconn" data-v="'+k+'">'+(st[k]?'Reconnect':'Connect')+'</button></li>').join('')+'</ul><div class="row" style="margin-top:10px"><button class="btn ghost sm" data-act="signout">Sign out</button></div></div>'}
+function settingsP(){if(window.PA&&!paSt){paSt={};PA.status().then(s=>{paSt=s||{};if(tab==='settings')render()})}const s=S.settings,f=(n,l,t)=>'<label class="f">'+l+'<input name="'+n+'" type="'+t+'" value="'+esc(s[n])+'"></label>';
+ const th=s.theme||'Match device';return head('Settings','Your preferences.')+standaloneCard()+'<div class="card" style="margin-bottom:18px"><h3>Colors</h3><div class="scroll subs" style="margin:0">'+['Light','Dark','Match device'].map(x=>'<button data-act="theme" data-v="'+x+'" class="'+(th===x?'on':'')+'">'+x+'</button>').join('')+'</div><div class="row" style="margin-top:12px"><button class="btn" data-act="invert">Switch colors</button></div></div><form class="add card" data-settings="1">'+f('name','Your first name','text')+f('city','Your city (for weather)','text')+f('heads','Birthday heads-up on Home (days)','number')+f('giftDays','Ask about gift ideas (days before)','number')+f('wmin','Weekly workout goal (min)','number')+'<label class="f">Holidays in Events<select name="holidays"><option'+(s.holidays!=='Off'?' selected':'')+'>On</option><option'+(s.holidays==='Off'?' selected':'')+'>Off</option></select></label><label class="f" style="grid-column:1/-1">Stores (comma separated)<input name="stores" value="'+esc(s.stores.join(', '))+'"></label><div><button class="btn">Save</button></div></form>'}
+function searchP(){const q=query.toLowerCase();let h='<h2>Search</h2><p class="sub">Results for “'+esc(query)+'”</p>',n=0;
+ [['todos','To-dos'],['reminders','Reminders'],['people','People & gift ideas'],['dates','Anniversaries'],['appts','Appointments'],['bills','Bills'],['subs','Subscriptions'],['spend','Spending'],['goals','Goals'],['recipes','Recipes'],['workouts','Workouts'],['shop','Shopping']].forEach(([k,l])=>{const hits=S[k].filter(i=>JSON.stringify(i).toLowerCase().includes(q));if(hits.length){n+=hits.length;h+='<h3 style="margin-top:18px">'+l+'</h3><div class="card"><ul class="list">'+R[k](hits)+'</ul></div>'}});
+ const ev=upcoming(60).filter(u=>JSON.stringify(u).toLowerCase().includes(q));if(ev.length){n+=ev.length;h+='<h3 style="margin-top:18px">Calendar & events</h3><div class="card"><ul class="list">'+ev.map(x=>'<li><div class="when">'+fmtD(x.date)+'<small>'+esc(x.k)+'</small></div><div class="grow"><b>'+esc(x.t)+'</b></div></li>').join('')+'</ul></div>'}
+ return h+(n?'':'<p class="empty">Nothing matches.</p>')}
+function applyTheme(){const t=S.settings.theme;if(t==='Light'||t==='Dark')document.documentElement.dataset.theme=t.toLowerCase();else delete document.documentElement.dataset.theme}
+function render(){applyTheme();
+ const d=new Date();$('#date').textContent=d.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'});
+ const hr=d.getHours();$('#hello').textContent=(hr<12?'Good morning':hr<18?'Good afternoon':'Good evening')+(S.settings.name?', '+S.settings.name:'')+'.';
+ paintWx();
+ $('#tabs').innerHTML=TABS.map(([k,l])=>'<a href="#'+k+'" class="'+(k===tab&&!query?'on':'')+'">'+l+'</a>').join('');
+ const fe=document.activeElement,fn=fe&&fe.name,fk=fe&&fe.form&&(fe.form.dataset.form||fe.form.dataset.food);
+ const P={notes:notesP,home,todos:todosP,events:eventsP,habits:habitsP,goals:goalsP,health:healthP,shopping:shopP,money:moneyP,settings:settingsP};
+ try{$('#main').innerHTML=query?searchP():P[tab]()}catch(err){$('#main').innerHTML='<div class="card"><b>Something went wrong showing this page.</b><p class="meta">'+esc(err&&err.message)+'</p></div>'}
+ Object.keys(aiOut).forEach(paintAI);
+ {const cw=document.getElementById('calwrap');if(cw){if(cw.dataset.k===calScrollKey)cw.scrollTop=calScrollPos;else cw.scrollTop=+cw.dataset.st;calScrollPos=cw.scrollTop;calScrollKey=cw.dataset.k;cw.onscroll=()=>{calScrollPos=cw.scrollTop}}}
+ if(fk&&fn){const el=document.querySelector('[data-form="'+fk+'"] [name="'+fn+'"],[data-food="'+fk+'"] [name="'+fn+'"]');if(el)el.focus()}
+}
+
+/* ---------- events ---------- */
+document.addEventListener('submit',async e=>{const f=e.target;e.preventDefault();const o={};new FormData(f).forEach((v,n)=>o[n]=v);const ds=f.dataset;
+ if(ds.form){const k=ds.form;
+  if(k==='notes')o.updated=today();if(editing&&editing.k===k){delete o.tocal;const it=find(k,editing.id);if(k==='people')delete it.nobday;Object.assign(it,o);editing=null;toast('Saved')}
+  else{if(k==='todos')o.done=false;if(k==='goals'){const h=subOf('goals');o.horizon=h;o.period=goalPer(h)}if(k==='people')o.gifts=[];
+   add(k,o,k==='todos'||k==='spend');toast('Added')}
+  save(k);render();const first=document.querySelector('[data-form="'+k+'"] input');if(first)first.focus()}
+ else if(ds.appt){let by=o.by||'';if(!by&&o.last&&REPS[o.repeat]){const d=pd(o.last);d.setMonth(d.getMonth()+REPS[o.repeat]);by=ymd(d)}const a={title:o.title,cat:o.cat,status:ds.appt,date:o.date||'',time:o.time||'',where:o.where||'',by,last:o.last||'',repeat:o.repeat||'No',notes:o.notes||''};add('appts',a);if(o.cal)await sendCal(a);toast(ds.appt==='Booked'?'Added to Confirmed / booked':'Added to To schedule')}
+ else if(ds.book){const a=find('appts',ds.book);Object.assign(a,{status:'Booked',date:o.date,time:o.time||'',where:o.where||''});bookOpen=null;save('appts');render();toast('Booked — moved to Confirmed / booked');if(o.cal)await sendCal(a)}
+ else if(ds.hl){if(!o.t.trim())return;const L=S.hlists[ds.hl]=S.hlists[ds.hl]||[];L.push({id:uid(),text:o.t.trim(),done:false});save('hlists');render();const f=document.querySelector('[data-hl="'+CSS.escape(ds.hl)+'"] input');if(f)f.focus()}
+ else if(ds.vcreate){if(o.p1!==o.p2){vErr='Passcodes don’t match.';render();return}vErr='';const salt=crypto.getRandomValues(new Uint8Array(16));vkey=await vDerive(o.p1,salt);V=[];S.vault={salt:b64(salt)};await vSave();render();toast('Locked notes ready')}
+ else if(ds.vunlock){try{const k=await vDerive(o.p,ub64(S.vault.salt));const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(S.vault.iv)},k,ub64(S.vault.ct));V=JSON.parse(new TextDecoder().decode(pt));vkey=k;vErr='';vTouch()}catch(err){vErr='Wrong passcode.'}render()}
+ else if(ds.vimp){if(!V)return;vImp=vParse(o.t||'');if(!vImp.length){vImp=null;toast('Nothing to import')}vTouch();render()}
+ else if(ds.vadd){if(!V)return;if(!o.title.trim()){toast('Add a name');return}if(vEdit){Object.assign(V.find(x=>x.id===vEdit),o);vEdit=null}else V.unshift({id:uid(),...o});await vSave();render();toast('Saved & locked')}
+ else if(ds.brief){S.settings.briefTime=o.t||'07:00';S.settings.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;save('settings');toast('Brief time saved')}
+ else if(ds.food){if(!o.kcal){const m=S.recipes.find(r=>r.name.toLowerCase()===o.name.toLowerCase())||[...S.food].reverse().find(x=>x.name.toLowerCase()===o.name.toLowerCase());if(m)o.kcal=m.kcal}S.food.push({id:uid(),date:dDay||today(),meal:ds.food,name:o.name,kcal:+o.kcal||0});save('food');render();const el=document.querySelector('[data-food="'+ds.food+'"] [name=name]');if(el)el.focus()}
+ else if(ds.kcal){S.settings.kcal=o.kcal;save('settings');render();toast('Goal set')}
+ else if(ds.logrec){const r=find('recipes',ds.logrec);S.food.push({id:uid(),date:today(),meal:o.meal,name:r.name,kcal:+r.kcal||0});save('food');toast('Logged to '+o.meal)}
+ else if(ds.gift){if(!o.g.trim())return;const p=find('people',ds.gift);const kind=e.submitter&&e.submitter.value;if(kind==='plan'){(p.plans=p.plans||[]).push({id:uid(),text:o.g.trim()});toast('Plan saved')}else{(p.gifts=p.gifts||[]).push({id:uid(),idea:o.g.trim(),added:today()});toast('Gift idea saved')}save('people');render()}
+ else if(ds.shop){S.shop.push({id:uid(),store,name:o.name,kind:o.kind,fav:!!o.fav,on:true,got:false});save('shop');render();const el=document.querySelector('[data-shop] [name=name]');if(el)el.focus()}
+ else if(ds.steps){S.steps[today()]=o.steps;save('steps');render();toast('Steps saved')}
+ else if(ds.reg){for(const d of[1,2,3,4,5])S.regimen[d]={name:o['n'+d]||'',ex:o['e'+d]||''};save('regimen');render();toast('Regimen saved')}
+ else if(ds.budget){const B={};CATS.forEach(c=>{if(+o[c])B[c]=+o[c]});S.settings.budgets=B;save('settings');render();toast('Budgets saved')}
+ else if(ds.settings){Object.assign(S.settings,o);setTimeout(initWx,0);S.settings.stores=String(o.stores).split(',').map(x=>x.trim()).filter(Boolean);if(!S.settings.stores.length)S.settings.stores=['Groceries'];save('settings');render();toast('Settings saved')}
+});
+function command(q){scrollTo({top:0,behavior:'smooth'});return ask('ask',sys+snapshot()+'\n\nThe user says: "'+q+'"\n\nIf they want something added, logged, changed, finished or removed, use the tools (for changes: find_items first, then update_item / complete_item / delete_item), then confirm what you did in one short line. They may be speaking, so allow for transcription slips. Gift ideas like "X gift idea for mom" go to add_gift_idea. For questions or lookups ("when is Ben\'s birthday", "what\'s on my Costco list"), use search_everything or the data and answer in a few lines.',true)}
+$('#askf').addEventListener('submit',e=>{e.preventDefault();const q=$('#askq').value.trim();if(!q)return;$('#askq').value='';command(q)});
+/* ---------- voice ---------- */
+let dict=null,vtxt='',vpart='',vlive=false;
+const vshow=on=>{$('#vpanel').hidden=!on;$('#mic').classList.toggle('on',on);$('#mic').setAttribute('aria-label',on?'Stop and send':'Speak to the app')};
+const vpaint=()=>{$('#vtext').textContent=(vtxt+' '+vpart).trim()||'Say something like “add paper towels to Costco” or “move the dentist to Friday at 3”.'};
+claude.use('dictation').then(d=>{if(!d)return;dict=d;$('#mic').hidden=false;
+ d.onPartial(({text})=>{vpart=text;vpaint()});d.onFinal(({text})=>{vtxt=(vtxt+' '+text).trim();vpart='';vpaint()});
+ d.onState(({state})=>{vlive=state==='listening';$('#vstate').textContent=vlive?'Listening…':'Ready'})}).catch(()=>{});
+async function vfinish(send){vshow(false);try{await dict.stop()}catch(e){}const q=(vtxt+' '+vpart).trim();vtxt='';vpart='';if(send&&q){$('#askq').value='';toast('Got it: '+q.slice(0,60));command(q)}}
+$('#mic').addEventListener('click',()=>{if(!dict)return;if(!$('#vpanel').hidden){vfinish(true);return}
+ vtxt='';vpart='';vpaint();vshow(true);dict.start().catch(e=>{vshow(false);toast(e&&e.code==='not_granted'?'Microphone not allowed — you can still type up top':'Couldn’t start the mic')})});
+$('#vdone').addEventListener('click',()=>vfinish(true));$('#vcancel').addEventListener('click',()=>vfinish(false));
+document.addEventListener('change',e=>{const p=e.target.dataset&&e.target.dataset.plan;if(p){const[d,m]=p.split('|');S.plan[d]=S.plan[d]||{};S.plan[d][m]=e.target.value;save('plan')}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,i=b.dataset.id;
+ if(a==='sub'){S.sub[b.dataset.k]=b.dataset.v;editing=null;save('sub');render()}
+ else if(a==='edit'){editing={k:b.dataset.k,id:i};render();scrollTo({top:document.querySelector('[data-form]')?document.querySelector('[data-form]').getBoundingClientRect().top+scrollY-80:0,behavior:'smooth'})}
+ else if(a==='cancel'){editing=null;render()}
+ else if(a==='del'){const k=b.dataset.k,idx=S[k].findIndex(x=>x.id===i),[gone]=S[k].splice(idx,1);save(k);render();undo(()=>{S[k].splice(idx,0,gone);save(k);render()})}
+ else if(a==='tog'){const t=find('todos',i);t.done=!t.done;save('todos');render()}
+ else if(a==='step'){const t=find('todos',i);t.steps[+b.dataset.j].done=b.checked;save('todos')}
+ else if(a==='paid'){const x=find('bills',i),m=billDue(x).cur;x.paid=x.paid===m?'':m;save('bills');render()}
+ else if(a==='gp'){const g=find('goals',i);g.progress=Math.max(0,(+g.progress||0)+ +b.dataset.d);save('goals');render()}
+ else if(a==='gdone'){const g=find('goals',i);g.done=!g.done;save('goals');render()}
+ else if(a==='rdone'){const r=find('reminders',i);if(r.repeat&&r.repeat!=='Never'){r.when=advance(r.when,r.repeat);toast('Next: '+fmtD(r.when))}else{S.reminders=S.reminders.filter(x=>x.id!==i);toast('Done')}save('reminders');render()}
+ else if(a==='hab'){const t=b.dataset.d||today(),l=S.habitlog[t]=S.habitlog[t]||[];const ix=l.indexOf(i);ix<0?l.push(i):l.splice(ix,1);save('habitlog');render()}
+ else if(a==='addhab'){add('habits',{name:b.dataset.v})}
+ else if(a==='texted'){find('people',i).texted=today().slice(0,4);save('people');render()}
+ else if(a==='pdel'){const p=find('people',b.dataset.p);p.plans=p.plans.filter(g=>g.id!==i);save('people');render()}
+ else if(a==='gdel'){const p=find('people',b.dataset.p);p.gifts=p.gifts.filter(g=>g.id!==i);save('people');render()}
+ else if(a==='gbought'){const p=find('people',b.dataset.p);p.gifts.find(g=>g.id===i).bought=today();save('people');render();toast('Nice — marked as bought')}
+ else if(a==='gskip'){const p=find('people',b.dataset.p);p.gifts.find(g=>g.id===i).skip=b.dataset.d;save('people');render()}
+ else if(a==='regdone'){const rg=S.regimen[new Date().getDay()]||{};S.workouts.push({id:uid(),date:today(),type:rg.name||'Workout',min:45,notes:'From regimen',reg:true});save('workouts');render();toast('Workout logged — edit minutes in the log')}
+ else if(a==='hli'){const it=(S.hlists[b.dataset.h]||[]).find(x=>x.id===i);if(it){it.done=!it.done;save('hlists');render()}}
+ else if(a==='hld'){S.hlists[b.dataset.h]=(S.hlists[b.dataset.h]||[]).filter(x=>x.id!==i);save('hlists');render()}
+ else if(a==='vlock')vLock();
+ else if(a==='vimpsave'){if(V&&vImp){V.unshift(...vImp);const n=vImp.length;vImp=null;vSave().then(()=>{render();toast(n+' entries locked')})}}
+ else if(a==='vimpx'){vImp=null;render()}
+ else if(a==='vshow'){vShow[i]=!vShow[i];vTouch();render()}
+ else if(a==='vcopy'){const x=V&&V.find(y=>y.id===i);if(x&&navigator.clipboard)navigator.clipboard.writeText(x.pass).then(()=>toast('Copied'),()=>toast('Couldn’t copy — tap Show instead'));vTouch()}
+ else if(a==='vedit'){vEdit=i;vTouch();render();scrollTo({top:0,behavior:'smooth'})}
+ else if(a==='vcancel'){vEdit=null;render()}
+ else if(a==='vdel'){if(V){const idx=V.findIndex(x=>x.id===i),[g]=V.splice(idx,1);vSave().then(render);undo(()=>{V.splice(idx,0,g);vSave().then(render)})}}
+ else if(a==='cnav'){calDate=addD(calDate,(calView==='Week'?7:1)*+b.dataset.d);watchCal();render()}
+ else if(a==='svallow'){svOk=false;svH=null;watchStrava()}
+ else if(a==='calallow'){calOk=false;calWeek='';watchCal(true)}
+ else if(a==='ctoday'){calDate=today();watchCal();render()}
+ else if(a==='cview'){calView=b.dataset.v;render()}
+ else if(a==='cday'){calDate=b.dataset.d;calView='Day';render()}
+ else if(a==='pushon'){PA.push.enable().then(r=>{toast(r==='granted'?'Notifications on':'Notifications not allowed');S.settings.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;save('settings');render()}).catch(e=>toast('Couldn’t turn on: '+(e&&e.message||e)))}
+ else if(a==='pushtest'){PA.push.test().then(()=>toast('Test sent'),e=>toast('Test failed: '+(e&&e.message||'error')))}
+ else if(a==='paconn'){PA.connect(b.dataset.v)}
+ else if(a==='signout'){PA.signOut()}
+ else if(a==='theme'){S.settings.theme=b.dataset.v;save('settings');render()}
+ else if(a==='invert'){const cur=S.settings.theme==='Dark'||(S.settings.theme!=='Light'&&matchMedia('(prefers-color-scheme: dark)').matches);S.settings.theme=cur?'Light':'Dark';save('settings');render()}
+ else if(a==='fwk'){fwk+= +b.dataset.d;render()}
+ else if(a==='fday'){const L=S.fitlog[b.dataset.d]=S.fitlog[b.dataset.d]||{};L.done=b.checked;if(L.done){const r=S.regimen[pd(b.dataset.d).getDay()]||{};L.ex=(r.ex||'').split('\n').map(x=>x.trim()).filter(Boolean).map((_,j)=>j)}save('fitlog');render()}
+ else if(a==='fex'){const L=S.fitlog[b.dataset.d]=S.fitlog[b.dataset.d]||{},j=+b.dataset.j;L.ex=L.ex||[];const ix=L.ex.indexOf(j);ix<0?L.ex.push(j):L.ex.splice(ix,1);const r=S.regimen[pd(b.dataset.d).getDay()]||{},n=(r.ex||'').split('\n').filter(x=>x.trim()).length;L.done=n>0&&L.ex.length>=n;save('fitlog');render()}
+ else if(a==='hwk'){hwk=Math.min(0,hwk+ +b.dataset.d);render()}
+ else if(a==='book'){bookOpen=i;render();const f=document.querySelector('[data-book] [name=date]');if(f)f.focus()}
+ else if(a==='bookx'){bookOpen=null;render()}
+ else if(a==='tocal'){sendCal(find('appts',i))}
+ else if(a==='dday'){dDay=addD(dDay||today(),+b.dataset.d);render()}
+ else if(a==='wk'){wkOff+= +b.dataset.d;render()}
+ else if(a==='store'){store=b.dataset.v;render()}
+ else if(a==='addstore'){$('#main').insertAdjacentHTML('afterbegin','<form class="add card" data-settings2="1"><label class="f">New store name<input class="inp" name="s" required autofocus></label><div><button class="btn">Add store</button></div></form>');const f=document.querySelector('[data-settings2]');f.querySelector('input').focus();f.onsubmit=ev=>{ev.preventDefault();const v=f.s.value.trim();if(v&&!S.settings.stores.includes(v))S.settings.stores.push(v);store=v;save('settings');render()}}
+ else if(a==='got'){const g=find('shop',i);g.got=!g.got;save('shop');render()}
+ else if(a==='fav'){const g=find('shop',i);g.fav=!g.fav;save('shop');render()}
+ else if(a==='refav'){const g=find('shop',i);g.on=true;g.got=false;save('shop');render()}
+ else if(a==='allfav'){S.shop.forEach(g=>{if(g.store===store&&g.fav&&!g.on){g.on=true;g.got=false}});save('shop');render()}
+ else if(a==='clrgot'){const before=JSON.parse(JSON.stringify(S.shop));S.shop=S.shop.filter(g=>!(g.store===store&&g.got&&!g.fav));S.shop.forEach(g=>{if(g.store===store&&g.got&&g.fav){g.on=false;g.got=false}});save('shop');render();undo(()=>{S.shop=before;save('shop');render()},'Cleared')}
+ else if(a==='plan2shop'){const ws=weekStart(wkOff);let n=0;for(let k=0;k<7;k++){const p=S.plan[addD(ws,k)]||{};Object.values(p).forEach(rid=>{const r=find('recipes',rid);if(!r)return;(r.ingredients||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(ing=>{const st=r.store||S.settings.stores[0];const ex=S.shop.find(g=>g.store===st&&g.name.toLowerCase()===ing.toLowerCase());if(ex){if(!ex.on||ex.got){ex.on=true;ex.got=false;n++}}else{S.shop.push({id:uid(),store:st,name:ing,kind:'Groceries',on:true,got:false});n++}})})}save('shop');toast(n?'Added '+n+' items to your lists':'Nothing new to add')}
+ else if(a==='planai')ask('planai',sys+JSON.stringify({recipes:S.recipes.map(r=>({name:r.name,kcal:r.kcal})),calorieGoal:S.settings.kcal})+'\n\nSuggest a simple 7-day dinner plan (Mon–Sun), one line per day, mostly using their saved recipes, plus 2 new easy recipe ideas worth adding. Under 120 words.')
+ else if(a==='plan')ask('plan',sys+snapshot()+'\n\nIt is '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'. Write a realistic plan for the rest of today: calendar first, then overdue/high-priority to-dos, today\'s workout, habits not done, bills due. Under 140 words.')
+ else if(a==='breakdown'){const t=find('todos',i);ask('bd','Break this task into 3-6 small, concrete next steps: "'+t.title+'". Reply with only a JSON array of short strings.').then(x=>{if(!x)return;let arr;try{arr=JSON.parse(x.slice(x.indexOf('['),x.lastIndexOf(']')+1))}catch(err){arr=x.split('\n').map(s=>s.replace(/^[-*\d.\s]+/,'').trim()).filter(Boolean)}t.steps=arr.slice(0,8).map(s=>({t:String(s),done:false}));delete aiOut.bd;save('todos');render();toast('Broken into '+t.steps.length+' steps')})}
+});
+function undo(fn,msg='Deleted'){const t=$('#toast');t.innerHTML=esc(msg)+' · <button class="ic" style="color:inherit;text-decoration:underline">Undo</button>';t.classList.add('show');t.style.pointerEvents='auto';t.querySelector('button').onclick=()=>{fn();t.classList.remove('show');t.style.pointerEvents='none'};clearTimeout(t._);t._=setTimeout(()=>{t.classList.remove('show');t.style.pointerEvents='none'},5000)}
+$('#wx').addEventListener('click',()=>{wxOpen=!wxOpen;paintWx()});
+$('#wxp').addEventListener('click',e=>{if(e.target.id==='wxallow')initWx(true);if(e.target.id==='wxhere'){S.settings.city='Current location';S.settings.wxKeyFor='';save('settings');initWx(true);toast('Weather follows your location')}});
+document.addEventListener('submit',e=>{if(e.target.id!=='wxcity')return;e.preventDefault();e.stopImmediatePropagation();const c=e.target.c.value.trim();if(c){S.settings.city=c;save('settings');initWx();toast('Weather set to '+c)}},true);
+addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)){if(tab==='notes'&&h!=='notes'&&V)vLock();tab=h;editing=null;query='';render();scrollTo(0,0)}});
+if(/connected=/.test(location.search)){setTimeout(()=>toast('Connected'),800);history.replaceState(null,'',location.pathname+'#settings');tab='settings'}
+load();
+}
+</script>
+</body>
+</html>
