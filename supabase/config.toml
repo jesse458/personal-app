@@ -5,3 +5,10 @@ verify_jwt = false
 verify_jwt = false
 [functions.notify]
 verify_jwt = false
+# These check the signed-in user themselves (works with the project's newer signing keys).
+[functions.ai]
+verify_jwt = false
+[functions.weather]
+verify_jwt = false
+[functions.steps]
+verify_jwt = false

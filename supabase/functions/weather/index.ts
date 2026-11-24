@@ -1,6 +1,14 @@
 // Weather: free Open-Meteo forecast + air quality + US National Weather Service alerts.
 // Returns the same shapes the app's weather panel already reads (current / hourly / 10-day / alerts).
-import { cors, json, userFrom } from "../_shared/util.ts";
+import { cors, json, userFrom, admin } from "../_shared/util.ts";
+
+// Lets the scheduler/diagnostics call this without a signed-in user.
+async function internal(req: Request) {
+  const s = req.headers.get("x-cron-secret");
+  if (!s) return false;
+  const { data } = await admin().from("app_config").select("value").eq("key", "cron_secret").maybeSingle();
+  return !!data && data.value === s;
+}
 
 const WMO: Record<number, [string, number]> = { // code -> [phrase, icon]
   0: ["Sunny", 1], 1: ["Mostly sunny", 2], 2: ["Partly cloudy", 3], 3: ["Cloudy", 7], 45: ["Fog", 11], 48: ["Fog", 11],
@@ -76,7 +84,7 @@ async function forecast(key: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!(await userFrom(req))) return json({ error: "Sign in first", code: "not_granted" }, 401);
+  if (!(await internal(req)) && !(await userFrom(req))) return json({ error: "Sign in first", code: "not_granted" }, 401);
   try {
     const { tool, input } = await req.json();
     const q = (input && input.queryParams) || {};
@@ -87,7 +95,8 @@ Deno.serve(async (req) => {
     if (tool === "widgets-daily-claude") return json(all.day);
     return json({ error: "Unknown weather request", code: "bad_request" }, 400);
   } catch (e) {
-    return json({ error: "Weather unavailable right now", code: "server_unavailable" }, 502);
+    console.error("weather failed", e);
+    return json({ error: "Weather unavailable right now", code: "server_unavailable", detail: String(e?.stack || e).slice(0, 400) }, 502);
   }
 });
 
