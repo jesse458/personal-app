@@ -197,6 +197,7 @@
       location.href = C.SUPABASE_URL + '/functions/v1/' + which + '?action=connect&token=' + encodeURIComponent(s.access_token) + '&back=' + encodeURIComponent(location.origin + location.pathname);
     },
     async status() { try { return await fn('notify', { status: true }); } catch (e) { return {}; } },
+    stepsToken: async () => (await fn('steps', { action: 'token' })).token,
     push, signOut: () => sb.auth.signOut().then(() => location.reload()), sb
   };
   window.PA = PA;
