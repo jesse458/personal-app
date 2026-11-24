@@ -129,6 +129,10 @@ a.lnk{color:var(--hl);font-weight:600}
 .ev.app{background:var(--soft);color:var(--ink);border:1px solid var(--ink)}
 .ev.ad{position:static;padding:2px 6px}
 .nowline{position:absolute;left:0;right:0;height:2px;background:var(--coral);z-index:2}.nowline::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--coral)}
+.modalwrap{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:20px}.modalwrap[hidden]{display:none}
+.modal{background:var(--card);color:var(--ink);border-radius:16px;padding:20px;width:min(380px,100%);box-shadow:0 20px 50px rgba(0,0,0,.35)}.modal p{margin:0 0 16px;font-size:17px}
+.btn.danger{background:var(--coral);color:#fff}
+.undobtn{position:fixed;left:max(18px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));z-index:8;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:10px 16px;min-height:44px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
 .mic{position:fixed;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));z-index:8;width:64px;height:64px;border-radius:50%;border:0;background:var(--ink);color:var(--card);box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer;display:grid;place-items:center}
 .mic.on{background:var(--coral);color:#fff;animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 12px rgba(224,87,62,.25)}}
@@ -158,6 +162,8 @@ main{padding-bottom:120px}
 <nav><div class="scroll" id="tabs"></div></nav>
 <main id="main"></main>
 <div class="toast" id="toast" role="status"></div>
+<div class="modalwrap" id="modal" hidden><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mq"><p id="mq"></p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-n>Cancel</button><button class="btn danger" data-y>Delete</button></div></div></div>
+<button class="undobtn" id="undoBtn" hidden aria-label="Undo last change">↶ Undo</button>
 <div class="vpanel" id="vpanel" hidden><b id="vstate">Listening…</b><p id="vtext" class="meta"></p><div class="row" style="margin-top:10px"><button class="btn sm" id="vdone">Done — do it</button><button class="btn ghost sm" id="vcancel">Cancel</button></div></div>
 <button class="mic" id="mic" hidden aria-label="Speak to the app"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></button>
 <script>
@@ -190,7 +196,7 @@ const rel=n=>n===0?'Today':n===1?'Tomorrow':n===-1?'Yesterday':n<0?(-n)+' days a
 const tm=s=>{if(!s||s.length<16)return'';const[h,m]=s.slice(11,16).split(':').map(Number);return((h+11)%12+1)+(m?':'+pad(m):'')+(h<12?'am':'pm')};
 const money=n=>'$'+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const sum=(a,f)=>a.reduce((t,x)=>t+(+f(x)||0),0);
-const toast=m=>{const t=$('#toast');t.textContent=m;t.style.pointerEvents='none';t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2200)};
+const toast=m=>{const t=$('#toast'),last=typeof undoStack!=='undefined'&&undoStack[undoStack.length-1],fresh=last&&Date.now()-last.t<1500&&m!=='Undone';t.textContent=m;if(fresh){const b=document.createElement('button');b.className='ic';b.style.cssText='color:inherit;text-decoration:underline;margin-left:6px';b.textContent='Undo';b.onclick=()=>{t.classList.remove('show');doUndo()};t.append(' · ',b)}t.style.pointerEvents=fresh?'auto':'none';t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>{t.classList.remove('show');t.style.pointerEvents='none'},fresh?6000:2200)};
 const goalPer=h=>h==='Weekly'?weekStart():h==='Monthly'?today().slice(0,7):today().slice(0,4);
 const subOf=k=>SUBS[k].includes(S.sub[k])?S.sub[k]:SUBS[k][0];
 const find=(k,i)=>S[k].find(x=>x.id===i);
@@ -222,7 +228,12 @@ function upcoming(n){const out=[],lim=addD(today(),n);
 
 /* ---------- storage ---------- */
 const dirty=new Set();let saveT;
-function save(k){dirty.add(k);try{localStorage.setItem('pa2',JSON.stringify(S))}catch(e){}clearTimeout(saveT);saveT=setTimeout(flush,700)}
+let undoStack=[],lastSaved={},noUndo=false;
+const clone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
+function snapAll(){Object.keys(S).forEach(k=>lastSaved[k]=clone(S[k]))}
+const NOUNDO=new Set(['sub','weather']);
+function paintUndo(){const b=document.getElementById('undoBtn');if(b)b.hidden=!undoStack.length}
+function save(k){if(!noUndo&&!NOUNDO.has(k)){const last=undoStack[undoStack.length-1];if(!(last&&last.k===k&&Date.now()-last.t<60))undoStack.push({k,before:clone(lastSaved[k]),t:Date.now()});else last.t=Date.now();if(undoStack.length>40)undoStack.shift();paintUndo()}lastSaved[k]=clone(S[k]);dirty.add(k);try{localStorage.setItem('pa2',JSON.stringify(S))}catch(e){}clearTimeout(saveT);saveT=setTimeout(flush,700)}
 async function flush(){if(!db)return dirty.clear();const ks=[...dirty];dirty.clear();for(const k of ks){if(k==='weather')continue;try{await db.doc('app/'+k).set({items:S[k],at:Date.now()})}catch(e){dirty.add(k);setStatus('Couldn’t save just now — will retry with your next change.')}}}
 const setStatus=t=>{$('#status').textContent=t};
 function unwrap(r){const v0=unwrap0(r);return v0===undefined||v0===null?v0:JSON.parse(JSON.stringify(v0))}
@@ -236,7 +247,7 @@ function migrate(o){if(!o)return;const st=S.settings.stores[0];
 async function load(){
  let local=null;try{local=JSON.parse(localStorage.getItem('pa2')||'null')}catch(e){}
  if(local)Object.assign(S,local);else{try{migrate(JSON.parse(localStorage.getItem('pa-state')||'null'))}catch(e){}}
- render();
+ snapAll();render();
  claude.use('sample').then(s=>{sample=s;if(s)render()}).catch(()=>{});
  claude.use('mcp').then(m=>{mcp=m;render();initWx();watchCal();watchStrava()}).catch(()=>{});
  let lastDay=today();setInterval(()=>{if(today()!==lastDay){if(calDate===lastDay)calDate=today();lastDay=today();watchCal()}if(tab==='home'&&!document.querySelector('form :focus'))render()},300000);
@@ -250,7 +261,7 @@ async function load(){
   keys.forEach((k,i)=>{if(vals[i]!==undefined&&vals[i]!==null){S[k]=k==='settings'?{...S.settings,...vals[i]}:vals[i];any=true}});
   if(!any){try{const user=await claude.use('user');const u=user&&await user.id();if(u){const old={};for(const k of['settings','todos','reminders','people','bills','goals','workouts','meals','groceries']){old[k]=await db.doc('data/users/'+u+'/'+k).get().then(unwrap).catch(()=>undefined)}migrate(old)}}catch(e){}
    keys.forEach(k=>{if(k!=='weather')dirty.add(k)});flush()}
-  setStatus('');spawn();render();initWx();
+  setStatus('');snapAll();spawn();render();initWx();
   try{db.doc('app/weather').onSnapshot(s=>{const w=unwrap(s);if(w){S.weather=w;paintWx()}})}catch(e){}
  }catch(e){clearTimeout(timer);setStatus('Saved on this device only — sync is unavailable right now.')}
 }
@@ -326,7 +337,7 @@ const aiTools=[
   else if(k==='reminders'){if(x.repeat&&x.repeat!=='Never')x.when=advance(x.when,x.repeat);else S.reminders=S.reminders.filter(r=>r.id!==x.id)}
   else if(k==='habits'){const t=today(),l=S.habitlog[t]=S.habitlog[t]||[];if(!l.includes(x.id))l.push(x.id);save('habitlog')}
   save(k);render();return'done'}),
- T('delete_item','Delete an item found with find_items.',{section:str,id:str},['section','id'],i=>{if(!LISTS.includes(i.section))return'unknown';S[i.section]=S[i.section].filter(x=>x.id!==i.id);save(i.section);render();return'deleted'}),
+ T('delete_item','Delete an item found with find_items. The user is asked to confirm.',{section:str,id:str},['section','id'],async i=>{if(!LISTS.includes(i.section))return'unknown';const it=find(i.section,i.id);if(!it)return'not found';if(!(await confirmBox('The assistant wants to delete “'+itemName(it)+'”. OK?')))return'the user said no — nothing was deleted';S[i.section]=S[i.section].filter(x=>x.id!==i.id);save(i.section);render();return'deleted (the user can undo)'}),
  T('update_settings','Change a setting: kcal (daily calorie goal), city (when they say where they are, e.g. "I\'m in Santa Barbara" → "Santa Barbara, CA"), name, heads, giftDays, wmin.',{key:str,value:str},['key','value'],i=>{if(!['kcal','city','name','heads','giftDays','wmin'].includes(i.key))return'unknown';S.settings[i.key]=i.value;save('settings');render();if(i.key==='city')initWx();return'saved'}),
  T('log_steps','Save today\'s step count.',{steps:num},['steps'],i=>{S.steps[today()]=i.steps;save('steps');render();return'saved'}),
  T('add_habit','Add a habit. group: Morning routine | Daily habits | Evening routine.',{name:str,group:str},['name'],i=>add('habits',{name:i.name,group:HG.includes(i.group)?i.group:'Daily habits'})),
@@ -559,6 +570,9 @@ function render(){applyTheme();
  if(fk&&fn){const el=document.querySelector('[data-form="'+fk+'"] [name="'+fn+'"],[data-food="'+fk+'"] [name="'+fn+'"]');if(el)el.focus()}
 }
 
+function confirmBox(msg,yes='Delete'){return new Promise(r=>{const m=$('#modal'),y=m.querySelector('[data-y]'),n=m.querySelector('[data-n]');$('#mq').textContent=msg;y.textContent=yes;m.hidden=false;const done=v=>{m.hidden=true;y.onclick=n.onclick=m.onclick=null;r(v)};y.onclick=()=>done(true);n.onclick=()=>done(false);m.onclick=e=>{if(e.target===m)done(false)};setTimeout(()=>y.focus(),0)})}
+function doUndo(){const u=undoStack.pop();if(!u){toast('Nothing to undo');return}noUndo=true;S[u.k]=clone(u.before)??(Array.isArray(S[u.k])?[]:{});save(u.k);noUndo=false;if(u.k==='vault'&&typeof vLock==='function')vLock();paintUndo();render();toast('Undone')}
+const itemName=x=>x?(x.title||x.name||x.what||x.idea||x.text||'this item'):'this item';
 /* ---------- events ---------- */
 document.addEventListener('submit',async e=>{const f=e.target;e.preventDefault();const o={};new FormData(f).forEach((v,n)=>o[n]=v);const ds=f.dataset;
  if(ds.form){const k=ds.form;
@@ -585,6 +599,8 @@ document.addEventListener('submit',async e=>{const f=e.target;e.preventDefault()
  else if(ds.settings){Object.assign(S.settings,o);setTimeout(initWx,0);S.settings.stores=String(o.stores).split(',').map(x=>x.trim()).filter(Boolean);if(!S.settings.stores.length)S.settings.stores=['Groceries'];save('settings');render();toast('Settings saved')}
 });
 function command(q){scrollTo({top:0,behavior:'smooth'});return ask('ask',sys+snapshot()+'\n\nThe user says: "'+q+'"\n\nIf they want something added, logged, changed, finished or removed, use the tools (for changes: find_items first, then update_item / complete_item / delete_item), then confirm what you did in one short line. They may be speaking, so allow for transcription slips. Gift ideas like "X gift idea for mom" go to add_gift_idea. For questions or lookups ("when is Ben\'s birthday", "what\'s on my Costco list"), use search_everything or the data and answer in a few lines.',true)}
+$('#undoBtn').addEventListener('click',doUndo);
+addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='z'&&!e.shiftKey&&!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')){e.preventDefault();doUndo()}});
 $('#askf').addEventListener('submit',e=>{e.preventDefault();const q=$('#askq').value.trim();if(!q)return;$('#askq').value='';command(q)});
 /* ---------- voice ---------- */
 let dict=null,vtxt='',vpart='',vlive=false;
@@ -602,7 +618,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
  if(a==='sub'){S.sub[b.dataset.k]=b.dataset.v;editing=null;save('sub');render()}
  else if(a==='edit'){editing={k:b.dataset.k,id:i};render();scrollTo({top:document.querySelector('[data-form]')?document.querySelector('[data-form]').getBoundingClientRect().top+scrollY-80:0,behavior:'smooth'})}
  else if(a==='cancel'){editing=null;render()}
- else if(a==='del'){const k=b.dataset.k,idx=S[k].findIndex(x=>x.id===i),[gone]=S[k].splice(idx,1);save(k);render();undo(()=>{S[k].splice(idx,0,gone);save(k);render()})}
+ else if(a==='del'){const k=b.dataset.k,it=find(k,i);confirmBox('Delete “'+itemName(it)+'”?').then(ok=>{if(!ok)return;S[k]=S[k].filter(x=>x.id!==i);save(k);render();toast('Deleted')})}
  else if(a==='tog'){const t=find('todos',i);t.done=!t.done;save('todos');render()}
  else if(a==='step'){const t=find('todos',i);t.steps[+b.dataset.j].done=b.checked;save('todos')}
  else if(a==='paid'){const x=find('bills',i),m=billDue(x).cur;x.paid=x.paid===m?'':m;save('bills');render()}
@@ -612,13 +628,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
  else if(a==='hab'){const t=b.dataset.d||today(),l=S.habitlog[t]=S.habitlog[t]||[];const ix=l.indexOf(i);ix<0?l.push(i):l.splice(ix,1);save('habitlog');render()}
  else if(a==='addhab'){add('habits',{name:b.dataset.v})}
  else if(a==='texted'){find('people',i).texted=today().slice(0,4);save('people');render()}
- else if(a==='pdel'){const p=find('people',b.dataset.p);p.plans=p.plans.filter(g=>g.id!==i);save('people');render()}
- else if(a==='gdel'){const p=find('people',b.dataset.p);p.gifts=p.gifts.filter(g=>g.id!==i);save('people');render()}
+ else if(a==='pdel'){const p=find('people',b.dataset.p);confirmBox('Remove this plan?','Remove').then(ok=>{if(!ok)return;p.plans=p.plans.filter(g=>g.id!==i);save('people');render();toast('Removed')})}
+ else if(a==='gdel'){const p=find('people',b.dataset.p);confirmBox('Remove this gift idea?','Remove').then(ok=>{if(!ok)return;p.gifts=p.gifts.filter(g=>g.id!==i);save('people');render();toast('Removed')})}
  else if(a==='gbought'){const p=find('people',b.dataset.p);p.gifts.find(g=>g.id===i).bought=today();save('people');render();toast('Nice — marked as bought')}
  else if(a==='gskip'){const p=find('people',b.dataset.p);p.gifts.find(g=>g.id===i).skip=b.dataset.d;save('people');render()}
  else if(a==='regdone'){const rg=S.regimen[new Date().getDay()]||{};S.workouts.push({id:uid(),date:today(),type:rg.name||'Workout',min:45,notes:'From regimen',reg:true});save('workouts');render();toast('Workout logged — edit minutes in the log')}
  else if(a==='hli'){const it=(S.hlists[b.dataset.h]||[]).find(x=>x.id===i);if(it){it.done=!it.done;save('hlists');render()}}
- else if(a==='hld'){S.hlists[b.dataset.h]=(S.hlists[b.dataset.h]||[]).filter(x=>x.id!==i);save('hlists');render()}
+ else if(a==='hld'){confirmBox('Remove this from the list?','Remove').then(ok=>{if(!ok)return;S.hlists[b.dataset.h]=(S.hlists[b.dataset.h]||[]).filter(x=>x.id!==i);save('hlists');render();toast('Removed')})}
  else if(a==='vlock')vLock();
  else if(a==='vimpsave'){if(V&&vImp){V.unshift(...vImp);const n=vImp.length;vImp=null;vSave().then(()=>{render();toast(n+' entries locked')})}}
  else if(a==='vimpx'){vImp=null;render()}
@@ -626,7 +642,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
  else if(a==='vcopy'){const x=V&&V.find(y=>y.id===i);if(x&&navigator.clipboard)navigator.clipboard.writeText(x.pass).then(()=>toast('Copied'),()=>toast('Couldn’t copy — tap Show instead'));vTouch()}
  else if(a==='vedit'){vEdit=i;vTouch();render();scrollTo({top:0,behavior:'smooth'})}
  else if(a==='vcancel'){vEdit=null;render()}
- else if(a==='vdel'){if(V){const idx=V.findIndex(x=>x.id===i),[g]=V.splice(idx,1);vSave().then(render);undo(()=>{V.splice(idx,0,g);vSave().then(render)})}}
+ else if(a==='vdel'){if(V)confirmBox('Delete the locked entry “'+itemName(V.find(x=>x.id===i))+'”?').then(ok=>{if(!ok)return;const idx=V.findIndex(x=>x.id===i),[g]=V.splice(idx,1);vSave().then(render);undo(()=>{V.splice(idx,0,g);vSave().then(render)})})}
  else if(a==='cnav'){calDate=addD(calDate,(calView==='Week'?7:1)*+b.dataset.d);watchCal();render()}
  else if(a==='svallow'){svOk=false;svH=null;watchStrava()}
  else if(a==='calallow'){calOk=false;calWeek='';watchCal(true)}
@@ -636,7 +652,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
  else if(a==='pushon'){PA.push.enable().then(r=>{toast(r==='granted'?'Notifications on':'Notifications not allowed');S.settings.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;save('settings');render()}).catch(e=>toast('Couldn’t turn on: '+(e&&e.message||e)))}
  else if(a==='pushtest'){PA.push.test().then(()=>toast('Test sent'),e=>toast('Test failed: '+(e&&e.message||'error')))}
  else if(a==='paconn'){PA.connect(b.dataset.v)}
- else if(a==='signout'){PA.signOut()}
+ else if(a==='signout'){confirmBox('Sign out of the app on this device?','Sign out').then(ok=>{if(ok)PA.signOut()})}
  else if(a==='theme'){S.settings.theme=b.dataset.v;save('settings');render()}
  else if(a==='invert'){const cur=S.settings.theme==='Dark'||(S.settings.theme!=='Light'&&matchMedia('(prefers-color-scheme: dark)').matches);S.settings.theme=cur?'Light':'Dark';save('settings');render()}
  else if(a==='fwk'){fwk+= +b.dataset.d;render()}
@@ -654,7 +670,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
  else if(a==='fav'){const g=find('shop',i);g.fav=!g.fav;save('shop');render()}
  else if(a==='refav'){const g=find('shop',i);g.on=true;g.got=false;save('shop');render()}
  else if(a==='allfav'){S.shop.forEach(g=>{if(g.store===store&&g.fav&&!g.on){g.on=true;g.got=false}});save('shop');render()}
- else if(a==='clrgot'){const before=JSON.parse(JSON.stringify(S.shop));S.shop=S.shop.filter(g=>!(g.store===store&&g.got&&!g.fav));S.shop.forEach(g=>{if(g.store===store&&g.got&&g.fav){g.on=false;g.got=false}});save('shop');render();undo(()=>{S.shop=before;save('shop');render()},'Cleared')}
+ else if(a==='clrgot'){const n=S.shop.filter(g=>g.store===store&&g.got).length;confirmBox('Clear '+n+' checked item'+(n===1?'':'s')+' from '+store+'?','Clear').then(ok=>{if(!ok)return;S.shop=S.shop.filter(g=>!(g.store===store&&g.got&&!g.fav));S.shop.forEach(g=>{if(g.store===store&&g.got&&g.fav){g.on=false;g.got=false}});save('shop');render();toast('Cleared')})}
  else if(a==='plan2shop'){const ws=weekStart(wkOff);let n=0;for(let k=0;k<7;k++){const p=S.plan[addD(ws,k)]||{};Object.values(p).forEach(rid=>{const r=find('recipes',rid);if(!r)return;(r.ingredients||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(ing=>{const st=r.store||S.settings.stores[0];const ex=S.shop.find(g=>g.store===st&&g.name.toLowerCase()===ing.toLowerCase());if(ex){if(!ex.on||ex.got){ex.on=true;ex.got=false;n++}}else{S.shop.push({id:uid(),store:st,name:ing,kind:'Groceries',on:true,got:false});n++}})})}save('shop');toast(n?'Added '+n+' items to your lists':'Nothing new to add')}
  else if(a==='planai')ask('planai',sys+JSON.stringify({recipes:S.recipes.map(r=>({name:r.name,kcal:r.kcal})),calorieGoal:S.settings.kcal})+'\n\nSuggest a simple 7-day dinner plan (Mon–Sun), one line per day, mostly using their saved recipes, plus 2 new easy recipe ideas worth adding. Under 120 words.')
  else if(a==='plan')ask('plan',sys+snapshot()+'\n\nIt is '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'. Write a realistic plan for the rest of today: calendar first, then overdue/high-priority to-dos, today\'s workout, habits not done, bills due. Under 140 words.')
