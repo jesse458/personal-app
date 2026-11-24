@@ -24,7 +24,7 @@ const paceDisp = (secPerMile: number) => `${Math.floor(secPerMile / 60)}:${Strin
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = new URL(req.url);
-  const action = url.searchParams.get("action");
+  const action = url.searchParams.get("action") || (url.pathname.endsWith("/callback") ? "callback" : null);
   const db = admin();
 
   if (action === "connect") {
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     const state = crypto.randomUUID();
     await db.from("oauth_states").insert({ state, user_id: user.id, provider: "strava", back: url.searchParams.get("back") });
     const s = new URL("https://www.strava.com/oauth/authorize");
-    s.search = new URLSearchParams({ client_id: env("STRAVA_CLIENT_ID"), redirect_uri: `${self()}?action=callback`, response_type: "code", scope: "read,activity:read_all", approval_prompt: "auto", state }).toString();
+    s.search = new URLSearchParams({ client_id: env("STRAVA_CLIENT_ID"), redirect_uri: `${self()}/callback`, response_type: "code", scope: "read,activity:read_all", approval_prompt: "auto", state }).toString();
     return Response.redirect(s.toString(), 302);
   }
   if (action === "callback") {

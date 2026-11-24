@@ -21,7 +21,7 @@ async function token(userId: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = new URL(req.url);
-  const action = url.searchParams.get("action");
+  const action = url.searchParams.get("action") || (url.pathname.endsWith("/callback") ? "callback" : null);
   const db = admin();
 
   // 1) Start connecting: /gcal?action=connect&token=<session>&back=<app url>
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const state = crypto.randomUUID();
     await db.from("oauth_states").insert({ state, user_id: user.id, provider: "gcal", back: url.searchParams.get("back") });
     const g = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-    g.search = new URLSearchParams({ client_id: env("GOOGLE_CLIENT_ID"), redirect_uri: `${self()}?action=callback`, response_type: "code", scope: SCOPES, access_type: "offline", prompt: "consent", state }).toString();
+    g.search = new URLSearchParams({ client_id: env("GOOGLE_CLIENT_ID"), redirect_uri: `${self()}/callback`, response_type: "code", scope: SCOPES, access_type: "offline", prompt: "consent", state }).toString();
     return Response.redirect(g.toString(), 302);
   }
   // 2) Google sends the user back here.
@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     await db.from("oauth_states").delete().eq("state", state);
     const r = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ code: url.searchParams.get("code") || "", client_id: env("GOOGLE_CLIENT_ID"), client_secret: env("GOOGLE_CLIENT_SECRET"), redirect_uri: `${self()}?action=callback`, grant_type: "authorization_code" }),
+      body: new URLSearchParams({ code: url.searchParams.get("code") || "", client_id: env("GOOGLE_CLIENT_ID"), client_secret: env("GOOGLE_CLIENT_SECRET"), redirect_uri: `${self()}/callback`, grant_type: "authorization_code" }),
     }).then((x) => x.json());
     if (!r.refresh_token) return new Response("Google didn't grant calendar access. Try Connect again.", { status: 400 });
     await db.from("integrations").upsert({ user_id: st.user_id, provider: "gcal", access_token: r.access_token, refresh_token: r.refresh_token, expires_at: new Date(Date.now() + r.expires_in * 1000).toISOString(), updated_at: new Date().toISOString() });
